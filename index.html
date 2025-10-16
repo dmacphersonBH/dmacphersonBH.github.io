@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AR Gallery</title>
+  <title>My Projects Hub</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -11,93 +11,103 @@
       padding: 0;
       background-color: #f5f5f5;
     }
-    .gallery-container {
+    header {
+      
+      color: #000000;
+      padding: 30px 0;
+      text-align: center;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 2.5em;
+    }
+    .projects-container {
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
-      padding: 20px;
+      padding: 40px 20px;
     }
-    .ar-card {
+    .project-card {
       background-color: #fff;
       border-radius: 10px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      margin: 15px;
+      margin: 20px;
       width: 300px;
-      text-align: center;
+      text-align: left; /* Changed from center */
       overflow: hidden;
-      transition: transform 0.3s ease;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      cursor: pointer;
     }
-    .ar-card:hover {
+    .project-card:hover {
       transform: translateY(-5px);
+      box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
     }
-    .ar-card img {
+    .project-card-image {
       width: 100%;
-      height: auto;
+      height: 180px;
+      object-fit: cover; /* Ensures images cover the area nicely */
+      display: block;
     }
-    .ar-card-content {
+    .project-card-content {
       padding: 15px;
     }
-    .ar-card-title {
-      font-size: 20px;
+    .project-card-title {
+      font-size: 22px;
       font-weight: bold;
-      margin: 10px 0;
+      margin: 5px 0 10px;
+      color: #007aff; /* Highlighted title color */
     }
-    .ar-card-description {
+    .project-card-description {
       font-size: 14px;
       color: #555;
-      margin: 10px 0 15px;
+      margin: 0 0 15px;
+      min-height: 40px; /* Ensures consistent card height */
     }
-    .ar-card-button {
-      display: inline-block;
-      padding: 10px 20px;
-      font-size: 16px;
-      color: #fff;
-      background-color: #007aff;
+    .card-link {
+      display: block; /* Make the whole card clickable */
       text-decoration: none;
-      border-radius: 5px;
-    }
-    .ar-card-button:hover {
-      background-color: #005bb5;
+      color: inherit;
     }
   </style>
 </head>
 <body>
-  <h1 style="text-align: center; padding: 20px 0;">Reality Composer Demos
-  </h1>
+  <header>
+    <h1>Welcome to Mr. Mac's Project Hub 👋</h1>
+    <p></p>
+  </header>
   
-  <div class="gallery-container">
-    <!-- AR Project 1 -->
-    <div class="ar-card">
-      <img src="orbits.png" alt="Orbit project preview">
-      <div class="ar-card-content">
-        <h2 class="ar-card-title">Planetary Orbits</h2>
-        <p class="ar-card-description">See the solar system on your desk! Watch the planets orbit the sun at their relative orbit speeds.</p>
-        <a rel="ar" href="orbits.reality" class="ar-card-button">View in AR</a>
-      </div>
-    </div>
-<!-- AR Project 3 -->
-<div class="ar-card">
-  <img src="jenga.png" alt="AR Project 3 Preview">
-  <div class="ar-card-content">
-    <h2 class="ar-card-title">Jenga Game</h2>
-    <p class="ar-card-description">Compete with friends to see who will make the tower fall first in this physics-based game! </p>
-    <a rel="ar" href="jenga.reality" class="ar-card-button">View in AR</a>
-  </div>
-</div>
-    <!-- AR Project 2 -->
-    <div class="ar-card">
-      <img src="bikeModel.png" alt="AR Project 2 Preview">
-      <div class="ar-card-content">
-        <h2 class="ar-card-title">Bike Model Assembly Guide</h2>
-        <p class="ar-card-description">See assembly instructions for a miniature bike in augmented reality!</p>
-        <a rel="ar" href="bikeModel.reality" class="ar-card-button">View in AR</a>
-      </div>
-    </div>
-
+  <div class="projects-container">
     
+    <a href="ar-gallery.html" class="card-link">
+      <div class="project-card">
+        <!-- <img src="ar-gallery-preview.png" alt="Augmented Reality Projects" class="project-card-image"> -->
+        <div class="project-card-content">
+          <h2 class="project-card-title">AR Gallery</h2>
+          <p class="project-card-description">A dedicated collection of interactive AR experiences built with Reality Composer.</p>
+        </div>
+      </div>
+    </a>
 
-    
+    <a href="quiltDesigner.html" class="card-link">
+      <div class="project-card">
+        <!-- <img src="greenthumb-preview.png" alt="Green Thumb Project" class="project-card-image"> -->
+        <div class="project-card-content">
+          <h2 class="project-card-title">Quilt Block Designer</h2>
+          <p class="project-card-description">An tool for designing colourful quilt blocks!</p>
+        </div>
+      </div>
+    </a>
+
+    <!-- <a href="other-project-link.html" class="card-link">
+      <div class="project-card">
+        <img src="other-project-preview.png" alt="Example Project" class="project-card-image">
+        <div class="project-card-content">
+          <h2 class="project-card-title">Data Visualization Project</h2>
+          <p class="project-card-description">Interactive charts and graphs showcasing complex data sets using D3.js.</p>
+        </div>
+      </div>
+    </a> -->
+
   </div>
-  <a href="greenthumb.html" class="button-class">Go to Green Thumb</a>
 </body>
 </html>
