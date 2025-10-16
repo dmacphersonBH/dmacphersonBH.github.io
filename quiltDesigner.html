@@ -11,20 +11,32 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f7f7f7;
-            /* Allow scrolling for the entire document if needed */
+            /* NEW: Use Flexbox on the body to center the content */
+            display: flex;
+            justify-content: center; /* Center horizontally */
+            align-items: flex-start; /* Align to the top, but allow vertical scrolling */
             min-height: 100vh;
             padding: 1rem;
+            margin: 0; /* Ensure no default body margins interfere */
+            /* Allow horizontal scrolling on the body if content expands past viewport */
+            overflow-x: auto; 
+            overflow-y: auto;
         }
         
-        /* The main quilt container is now a flex column to handle potential overflow */
+        /* NEW: Wrapper to hold the content centered, necessary since the inner div is no longer fixed width */
+        #app-center-wrapper {
+             /* Ensures the wrapper takes up the minimum space needed to contain the centered content */
+             display: inline-block; 
+        }
+
+        /* The main quilt container is now a flex column, allowing it to expand horizontally */
         #quiltArea {
             display: flex;
             flex-direction: column;
             align-items: center;
             padding: 1rem;
-            /* Allow internal scrolling if the canvas grows larger than the right pane */
-            overflow: auto; 
-            max-width: 100%; /* Ensure it respects the parent's width */
+            /* Remove overflow constraints to allow horizontal expansion */
+            overflow: visible; 
         }
 
         /* The canvas itself */
@@ -95,98 +107,97 @@
 </head>
 <body class="bg-gray-100">
 
-    <div class="max-w-7xl w-full mx-auto flex flex-col lg:flex-row gap-8 bg-white p-6 rounded-xl shadow-2xl">
-        
-        <div class="lg:w-1/3 space-y-6">
-            <h1 class="text-3xl font-bold text-gray-800 border-b pb-2">Quilt Block Designer</h1>
-            <p class="text-sm text-gray-600">
-                Left-click to draw</br> Right-click to erase </br> Number keys to select active colour
-              
-            </p>
-            <div class="space-y-1">
-                 <p class="font-semibold text-gray-700">Current Grid Size:</p>
-                 <div class="flex space-x-4">
-                     <span class="text-lg font-bold text-blue-600">ROWS: <span id="rowCountDisplay">8</span></span>
-                     <span class="text-lg font-bold text-blue-600">COLS: <span id="colCountDisplay">8</span></span>
-                 </div>
-            </div>
-
-            <div class="rounded-lg p-4 bg-blue-50 border border-blue-200">
-                <p class="font-semibold text-blue-700">Current Selection:</p>
-                <div id="currentSelection" class="flex items-center mt-2 space-x-2">
-                    </div>
-            </div>
-
-            <div class="space-y-2 pt-4 border-t border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-700">Select Color (1-10)</h2>
-                <div id="colorPalette" class="flex flex-wrap gap-2">
-                    </div>
-            </div>
-
-            <div class="space-y-2 pt-4 border-t border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-700">Customize Palette</h2>
-                <div id="colorEditor" class="grid grid-cols-5 gap-2">
-                    </div>
-                <p class="text-xs text-gray-500 pt-2">Your custom colors are saved automatically.</p>
-            </div>
+    <div id="app-center-wrapper">
+        <div class="mx-auto flex flex-col lg:flex-row gap-8 bg-white p-6 rounded-xl shadow-2xl">
             
-            <button id="clearAll" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition mt-8">
-                Clear All Triangles
-            </button>
-            
-            <div class="pt-4 border-t border-gray-200 space-y-2">
-                <h2 class="text-xl font-semibold text-gray-700">Export Design</h2>
-                <div class="flex space-x-2">
-                    <button id="exportPNG" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition">
-                        Export PNG
-                    </button>
-                    <button id="exportSVG" class="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg transition">
-                        Export SVG
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <div class="lg:w-2/3 p-4 overflow-x-auto overflow-y-auto flex justify-center" id="quiltArea">
-
-            <div id="quiltGridContainer">
-                
-                <div id="topRowControls" class="">
-                    <div class="flex items-center space-x-4">
+            <div class="lg:w-1/3 space-y-6 min-w-[300px]"> <h1 class="text-3xl font-bold text-gray-800 border-b pb-2">Quilt Block Designer</h1>
+                <p class="text-sm text-gray-600">
+                    Left-click to draw</br> Right-click to erase </br> Number keys to select active colour
                   
-                        <div class="grid-control-wrapper"><button id="removeRowTop" class="grid-btn">-</button></div>
-                        <div class="grid-control-wrapper"><button id="addRowTop" class="grid-btn">+</button></div>
-                    </div>
+                </p>
+                <div class="space-y-1">
+                     <p class="font-semibold text-gray-700">Current Grid Size:</p>
+                     <div class="flex space-x-4">
+                         <span class="text-lg font-bold text-blue-600">ROWS: <span id="rowCountDisplay">8</span></span>
+                         <span class="text-lg font-bold text-blue-600">COLS: <span id="colCountDisplay">8</span></span>
+                     </div>
                 </div>
 
-                <div id="leftColControls" class="v-controls-container mr-4">
-             
-                    <div class="grid-control-wrapper"><button id="removeColLeft" class="grid-btn">-</button></div>
-                    <div class="my-[40px]"></div> <div class="grid-control-wrapper"><button id="addColLeft" class="grid-btn">+</button></div>
+                <div class="rounded-lg p-4 bg-blue-50 border border-blue-200">
+                    <p class="font-semibold text-blue-700">Current Selection:</p>
+                    <div id="currentSelection" class="flex items-center mt-2 space-x-2">
+                        </div>
                 </div>
 
-                <div id="p5Canvas" class="shadow-xl">
-                    </div>
+                <div class="space-y-2 pt-4 border-t border-gray-200">
+                    <h2 class="text-xl font-semibold text-gray-700">Select Color (1-10)</h2>
+                    <div id="colorPalette" class="flex flex-wrap gap-2">
+                        </div>
+                </div>
 
-                <div id="rightColControls" class="v-controls-container ml-4">
-                    <div class="grid-control-wrapper"><button id="addRowRight" class="grid-btn">+</button></div>
-                    <div class="my-[40px]"></div> <div class="grid-control-wrapper"><button id="removeRowRight" class="grid-btn">-</button></div>
+                <div class="space-y-2 pt-4 border-t border-gray-200">
+                    <h2 class="text-xl font-semibold text-gray-700">Customize Palette</h2>
+                    <div id="colorEditor" class="grid grid-cols-5 gap-2">
+                        </div>
+                    <p class="text-xs text-gray-500 pt-2">Your custom colors are saved automatically.</p>
                 </div>
                 
-                <div id="bottomRowControls" class="">
-                    <div class="flex items-center space-x-4">
-                    
-                        <div class="grid-control-wrapper"><button id="removeRowBottom" class="grid-btn">-</button></div>
-                        <div class="grid-control-wrapper"><button id="addRowBottom" class="grid-btn">+</button></div>
+                <button id="clearAll" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition mt-8">
+                    Clear All Triangles
+                </button>
+                
+                <div class="pt-4 border-t border-gray-200 space-y-2">
+                    <h2 class="text-xl font-semibold text-gray-700">Export Design</h2>
+                    <div class="flex space-x-2">
+                        <button id="exportPNG" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition">
+                            Export PNG
+                        </button>
+                        <button id="exportSVG" class="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg transition">
+                            Export SVG
+                        </button>
                     </div>
                 </div>
-
             </div>
-            
-        </div>
-    </div>
 
-    <script type="module">
+            <div class="p-4 flex justify-center" id="quiltArea">
+
+                <div id="quiltGridContainer">
+                    
+                    <div id="topRowControls" class="">
+                        <div class="flex items-center space-x-4">
+                      
+                            <div class="grid-control-wrapper"><button id="removeRowTop" class="grid-btn">-</button></div>
+                            <div class="grid-control-wrapper"><button id="addRowTop" class="grid-btn">+</button></div>
+                        </div>
+                    </div>
+
+                    <div id="leftColControls" class="v-controls-container mr-4">
+                 
+                        <div class="grid-control-wrapper"><button id="removeColLeft" class="grid-btn">-</button></div>
+                        <div class="my-[40px]"></div> <div class="grid-control-wrapper"><button id="addColLeft" class="grid-btn">+</button></div>
+                    </div>
+
+                    <div id="p5Canvas" class="shadow-xl">
+                        </div>
+
+                    <div id="rightColControls" class="v-controls-container ml-4">
+                        <div class="grid-control-wrapper"><button id="addRowRight" class="grid-btn">+</button></div>
+                        <div class="my-[40px]"></div> <div class="grid-control-wrapper"><button id="removeRowRight" class="grid-btn">-</button></div>
+                    </div>
+                    
+                    <div id="bottomRowControls" class="">
+                        <div class="flex items-center space-x-4">
+                        
+                            <div class="grid-control-wrapper"><button id="removeRowBottom" class="grid-btn">-</button></div>
+                            <div class="grid-control-wrapper"><button id="addRowBottom" class="grid-btn">+</button></div>
+                        </div>
+                    </div>
+
+                </div>
+                
+            </div>
+        </div>
+    </div> <script type="module">
         // --- Firebase Imports ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
