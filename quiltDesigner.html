@@ -13,12 +13,23 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f7f7f7;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            /* Allow scrolling for the entire document if needed */
             min-height: 100vh;
             padding: 1rem;
         }
+        
+        /* The main quilt container is now a flex column to handle potential overflow */
+        #quiltArea {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1rem;
+            /* Allow internal scrolling if the canvas grows larger than the right pane */
+            overflow: auto; 
+            max-width: 100%; /* Ensure it respects the parent's width */
+        }
+
+        /* The canvas itself */
         canvas {
             border: 4px solid #2d3748; /* Dark gray border */
             border-radius: 0.5rem;
@@ -29,51 +40,85 @@
             outline: 4px solid #3b82f6; /* Blue ring */
             outline-offset: 2px;
         }
-        /* Style for the color input (picker) to ensure it fits the grid */
-        #colorEditor input[type="color"]::-webkit-color-swatch-wrapper {
-            padding: 0;
+        
+        /* Control Button Styling */
+        .grid-btn {
+            @apply bg-blue-600 text-white font-extrabold shadow-lg hover:bg-blue-700 transition duration-150 active:scale-95 disabled:bg-gray-400 disabled:cursor-not-allowed;
+            border-radius: 9999px; 
+            width: 44px; 
+            height: 44px; 
+            font-size: 24px;
+            line-height: 1; 
+            justify-content: center;
+            align-items: center;
         }
-        #colorEditor input[type="color"]::-webkit-color-swatch {
-            border: none;
-            border-radius: 0.375rem; /* rounded-lg */
+        .grid-control-wrapper {
+            width: 30; 
+            height: 30;
+            background-color: #e5e7eb; /* gray-200 */
+            border-radius: 9999px; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
         }
-        .preset-btn {
-            @apply bg-gray-200 text-gray-800 font-semibold py-2 px-3 rounded-lg shadow-md hover:bg-gray-300 transition duration-150;
-            white-space: nowrap;
+        
+        /* Styling for the vertical (LEFT/RIGHT) controls container */
+       
+
+        /* Grid Layout for the Interactive Area (Canvas + Controls) */
+        #quiltGridContainer {
+            display: grid;
+            /* 3 Columns: Left Controls | Canvas | Right Controls */
+            grid-template-columns: auto 1fr auto; 
+            /* 3 Rows: Top Controls | Canvas Row | Bottom Controls */
+            grid-template-rows: auto 1fr auto; 
+            justify-items: center; 
+            align-items: center; 
+            /* This inline-block ensures the grid container itself centers correctly 
+               and only takes up the space needed by the content */
+            display: inline-grid;
+        }
+
+        /* Assigning grid areas */
+        #topRowControls { grid-column: 2 / 3; grid-row: 1 / 2; width: 100%; display: flex; justify-content: space-around; padding: 1rem 0;}
+        #bottomRowControls { grid-column: 2 / 3; grid-row: 3 / 4; width: 100%; display: flex; justify-content: space-around; padding: 1rem 0;}
+
+        #leftColControls { grid-column: 1 / 2; grid-row: 2 / 3; }
+        #rightColControls { grid-column: 3 / 4; grid-row: 2 / 3; }
+
+        #p5Canvas { grid-column: 2 / 3; grid-row: 2 / 3; }
+
+        /* Hide the vertical labels */
+        .rotated-text {
+            display: none;
         }
     </style>
 </head>
-<body class="bg-gray-100 p-4">
+<body class="bg-gray-100">
 
-    <div class="max-w-4xl w-full flex flex-col lg:flex-row gap-8 bg-white p-6 rounded-xl shadow-2xl">
+    <div class="max-w-7xl w-full mx-auto flex flex-col lg:flex-row gap-8 bg-white p-6 rounded-xl shadow-2xl">
         
-        <!-- Controls Panel -->
+        <!-- Controls Panel (Left Window) -->
         <div class="lg:w-1/3 space-y-6">
-            <!-- UPDATED: Title changed to "Quilt Block Designer" -->
             <h1 class="text-3xl font-bold text-gray-800 border-b pb-2">Quilt Block Designer</h1>
             <p class="text-sm text-gray-600">
-                Each square is split into four Quarter Square Triangles (QSTs). 
-                Select a color and fill individual triangles below.
+                Design your block using Quarter Square Triangles (QSTs).
+                Use the buttons around the grid to expand or shrink the design area.
             </p>
-            <ul class="text-xs text-gray-600 list-disc ml-4 space-y-1">
-                <li>Use **Click & Drag** to paint.</li>
-                <li>Use **Right-Click & Drag** to erase (set to white, color 0).</li>
-                <li>Press **1-10** on the keyboard to switch colors.</li>
-            </ul>
+            <div class="space-y-1">
+                 <p class="font-semibold text-gray-700">Current Grid Size:</p>
+                 <div class="flex space-x-4">
+                     <span class="text-lg font-bold text-blue-600">ROWS: <span id="rowCountDisplay">8</span></span>
+                     <span class="text-lg font-bold text-blue-600">COLS: <span id="colCountDisplay">8</span></span>
+                 </div>
+            </div>
 
             <!-- Current Selection Status -->
             <div class="rounded-lg p-4 bg-blue-50 border border-blue-200">
                 <p class="font-semibold text-blue-700">Current Selection:</p>
                 <div id="currentSelection" class="flex items-center mt-2 space-x-2">
                     <!-- Displayed by JS -->
-                </div>
-            </div>
-
-            <!-- Pattern Presets -->
-            <div class="space-y-3 pt-4 border-t border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-700">Pattern Presets</h2>
-                <div id="patternPresets" class="flex flex-wrap gap-2">
-                    <!-- Preset buttons generated by JS -->
                 </div>
             </div>
 
@@ -85,7 +130,7 @@
                 </div>
             </div>
 
-            <!-- New: Custom Color Editor -->
+            <!-- Custom Color Editor -->
             <div class="space-y-2 pt-4 border-t border-gray-200">
                 <h2 class="text-xl font-semibold text-gray-700">Customize Palette</h2>
                 <div id="colorEditor" class="grid grid-cols-5 gap-2">
@@ -100,9 +145,52 @@
             </button>
         </div>
 
-        <!-- p5.js Canvas (Quilt Block) -->
-        <div id="p5Canvas" class="lg:w-2/3 flex justify-center items-center p-4">
-            <!-- Canvas is attached here -->
+        <!-- Quilt Area & Grid Controls (Right Window) -->
+        <div class="lg:w-2/3 p-4 overflow-x-auto overflow-y-auto flex justify-center" id="quiltArea">
+
+            <!-- Quilt Grid Container (uses CSS Grid for alignment) -->
+            <div id="quiltGridContainer">
+                
+                <!-- TOP CONTROLS: Add/Remove Rows on TOP -->
+                <div id="topRowControls" class="">
+                    <div class="flex items-center space-x-4">
+                  
+                        <div class="grid-control-wrapper"><button id="removeRowTop" class="grid-btn">-</button></div>
+                        <div class="grid-control-wrapper"><button id="addRowTop" class="grid-btn">+</button></div>
+                    </div>
+                </div>
+
+                <!-- LEFT CONTROLS: Add/Remove Columns on LEFT -->
+                <div id="leftColControls" class="v-controls-container mr-4">
+             
+                    <div class="grid-control-wrapper"><button id="removeColLeft" class="grid-btn">-</button></div>
+                    <div class="my-[40px]"></div> <!-- Spacer -->
+                    <div class="grid-control-wrapper"><button id="addColLeft" class="grid-btn">+</button></div>
+                </div>
+
+                <!-- CANVAS CONTAINER -->
+                <div id="p5Canvas" class="shadow-xl">
+                    <!-- Canvas is attached here -->
+                </div>
+
+                <!-- RIGHT CONTROLS: Add/Remove Columns on RIGHT -->
+                <div id="rightColControls" class="v-controls-container ml-4">
+                    <div class="grid-control-wrapper"><button id="addRowRight" class="grid-btn">+</button></div>
+                    <div class="my-[40px]"></div> <!-- Spacer -->
+                    <div class="grid-control-wrapper"><button id="removeRowRight" class="grid-btn">-</button></div>
+                </div>
+                
+                <!-- BOTTOM CONTROLS: Add/Remove Rows on BOTTOM -->
+                <div id="bottomRowControls" class="">
+                    <div class="flex items-center space-x-4">
+                    
+                        <div class="grid-control-wrapper"><button id="removeRowBottom" class="grid-btn">-</button></div>
+                        <div class="grid-control-wrapper"><button id="addRowBottom" class="grid-btn">+</button></div>
+                    </div>
+                </div>
+
+            </div>
+            
         </div>
     </div>
 
@@ -123,9 +211,12 @@
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         
         // --- Quilt Block Globals ---
-        const GRID_SIZE = 8;
-        const CANVAS_SIZE = 560;
-        const CELL_SIZE = CANVAS_SIZE / GRID_SIZE;
+        let ROWS = 8;
+        let COLS = 8;
+        const MIN_GRID = 4;
+        const MAX_GRID = 24; // Increased max grid size to 24x24
+        // The fixed pixel size for each cell (square). Canvas size will grow/shrink.
+        const CELL_SIZE = 70; 
 
         const PALETTE_DEFAULTS = [
             '#ffffff', // Index 0: White (Clear/Erase color)
@@ -144,281 +235,6 @@
         let PALETTE = [...PALETTE_DEFAULTS]; // Customizable palette
         let blockGrid = []; 
         let currentColorIndex = 1; 
-
-        // --- Block Pattern Definitions ---
-
-        const PATTERNS = {
-            '4 Patch': fourPatchPattern,
-            '9 Patch': ninePatchPattern,
-            'Half-Square Triangles (HST)': hstPattern,
-            'Pinwheel': pinwheelPattern,
-            'Flying Geese': flyingGeesePattern,
-            'Shoofly': shooflyPattern,
-            'Village House': villageHousePattern,
-        };
-
-        const COLOR_A = 1;
-        const COLOR_B = 2;
-        const COLOR_BACKGROUND = 0; // White
-
-        /** Sets all 4 QSTs in a cell to the given color index. */
-        const setSolidCell = (row, col, colorIndex) => {
-            if (row < GRID_SIZE && col < GRID_SIZE) {
-                blockGrid[row][col] = { top: colorIndex, right: colorIndex, bottom: colorIndex, left: colorIndex };
-            }
-        }
-        
-        /** Sets two opposite QSTs in a cell to create a diagonal split (HST look). */
-        const setHstCell = (row, col, colorA, colorB, orientation) => {
-            if (row < GRID_SIZE && col < GRID_SIZE) {
-                if (orientation === 'up-right') { // Splits along the main diagonal (bottom-left to top-right)
-                    blockGrid[row][col] = { top: colorA, right: colorA, bottom: colorB, left: colorB };
-                } else { // Splits along the anti-diagonal (top-left to bottom-right)
-                    blockGrid[row][col] = { top: colorA, right: colorB, bottom: colorB, left: colorA };
-                }
-            }
-        }
-
-        /** Clears the grid and applies the Four Patch pattern (4x4 blocks). */
-        function fourPatchPattern() {
-            initializeGrid();
-            for (let i = 0; i < GRID_SIZE; i++) {
-                for (let j = 0; j < GRID_SIZE; j++) {
-                    const isTopHalf = i < GRID_SIZE / 2;
-                    const isLeftHalf = j < GRID_SIZE / 2;
-                    
-                    let color = COLOR_BACKGROUND;
-                    
-                    if ((isTopHalf && isLeftHalf) || (!isTopHalf && !isLeftHalf)) {
-                        color = COLOR_A; // Top-Left and Bottom-Right
-                    } else {
-                        color = COLOR_B; // Top-Right and Bottom-Left
-                    }
-                    setSolidCell(i, j, color);
-                }
-            }
-        }
-
-        /** Clears the grid and applies the Nine Patch pattern (approximate 3x3 blocks). */
-        function ninePatchPattern() {
-            initializeGrid();
-            const D = Math.floor(GRID_SIZE / 3); // Approximately 2 cells for borders
-            
-            for (let i = 0; i < GRID_SIZE; i++) {
-                for (let j = 0; j < GRID_SIZE; j++) {
-                    const rowZone = Math.min(Math.floor(i / D), 2); // 0, 1, or 2
-                    const colZone = Math.min(Math.floor(j / D), 2); // 0, 1, or 2
-
-                    // Corners and Center get Color A (0,0), (0,2), (2,0), (2,2), (1,1)
-                    if ((rowZone !== 1 && colZone !== 1) || (rowZone === 1 && colZone === 1)) {
-                        setSolidCell(i, j, COLOR_A);
-                    } else {
-                        setSolidCell(i, j, COLOR_B); // Sides get Color B
-                    }
-                }
-            }
-        }
-
-        /** Clears the grid and applies the Half-Square Triangle pattern (full diagonal split). */
-        function hstPattern() {
-            initializeGrid();
-            for (let i = 0; i < GRID_SIZE; i++) {
-                for (let j = 0; j < GRID_SIZE; j++) {
-                    // Split cells along the main diagonal (bottom-left to top-right)
-                    setHstCell(i, j, COLOR_A, COLOR_B, 'up-right');
-                }
-            }
-        }
-        
-        /** Clears the grid and applies the Pinwheel pattern (4 large 4x4 blocks). */
-        function pinwheelPattern() {
-            initializeGrid();
-            const H = GRID_SIZE / 2; // 4
-            for (let i = 0; i < GRID_SIZE; i++) {
-                for (let j = 0; j < GRID_SIZE; j++) {
-                    const isTopHalf = i < H;
-                    const isLeftHalf = j < H;
-                    
-                    let orientation = 'up-right';
-                    let colorA = COLOR_A;
-                    let colorB = COLOR_B;
-
-                    if ((isTopHalf && isLeftHalf) || (!isTopHalf && !isLeftHalf)) {
-                        // Top-Left and Bottom-Right quadrants: Diagonal split A/B
-                        orientation = 'up-right';
-                        colorA = COLOR_A;
-                        colorB = COLOR_B;
-                    } else {
-                        // Top-Right and Bottom-Left quadrants: Diagonal split B/A
-                        orientation = 'up-right';
-                        colorA = COLOR_B;
-                        colorB = COLOR_A;
-                    }
-                    setHstCell(i, j, colorA, colorB, orientation);
-                }
-            }
-        }
-        
-        /** Clears the grid and applies the Flying Geese pattern (4 units stacked vertically). */
-        function flyingGeesePattern() {
-            initializeGrid();
-            const unitHeight = GRID_SIZE / 4; // 2 cells per unit
-            
-            for (let i = 0; i < GRID_SIZE; i++) {
-                const unitRow = Math.floor(i / unitHeight); // 0, 1, 2, or 3
-                const iInUnit = i % unitHeight; // 0 or 1
-                
-                for (let j = 0; j < GRID_SIZE; j++) {
-                    
-                    let colorGoose = COLOR_A;
-                    let colorSky = COLOR_B;
-                    
-                    // The goose is a large triangle pointing up, the sky fills the sides.
-                    // This is complex on QSTs, so we simulate the look:
-                    
-                    const jFromCenter = Math.abs(j - (GRID_SIZE / 2 - 0.5)); // Distance from center column
-                    
-                    if (iInUnit === 0) { // Top row of the unit
-                        // Center 2-3 cells are Goose, outer cells are Sky/QSTs
-                        if (j === 3 || j === 4) {
-                             // Use QSTs to form the peak
-                             if (j === 3) { // Left-Center Cell
-                                blockGrid[i][j] = { top: colorGoose, right: colorSky, bottom: colorGoose, left: colorSky };
-                             } else { // Right-Center Cell
-                                blockGrid[i][j] = { top: colorGoose, right: colorSky, bottom: colorGoose, left: colorSky };
-                             }
-                        } else if (j > 3.5 - iInUnit * 2 && j < 4.5 + iInUnit * 2) {
-                            setSolidCell(i, j, colorGoose); // Goose middle
-                        } else {
-                            setSolidCell(i, j, colorSky); // Sky sides
-                        }
-
-                    } else { // Bottom row of the unit (iInUnit === 1)
-                        // Make the bottom row mostly Goose, except the very sides
-                        const cell = blockGrid[i][j];
-                        
-                        // The entire second row (iInUnit == 1) of the unit is the Goose base
-                        setSolidCell(i, j, colorGoose);
-                    }
-                }
-            }
-            // A much simpler visual approach for Flying Geese on QSTs:
-            // Let's use 4x2 units where the QSTs are flipped to create the 'V' shape.
-            initializeGrid();
-            for (let i = 0; i < GRID_SIZE; i++) {
-                const unitRow = Math.floor(i / unitHeight);
-                const iInUnit = i % unitHeight;
-
-                for (let j = 0; j < GRID_SIZE; j++) {
-                    const cell = blockGrid[i][j];
-                    const jFromCenter = Math.abs(j - 3.5);
-
-                    if (iInUnit === 0) { // Top row of the 2-cell unit
-                        // Create the peak: Center QSTs are goose, sides are sky
-                        if (jFromCenter < 2.5) { // Center 5 cells are mostly goose
-                            // Use QSTs to make the "V" point
-                            cell.top = (j < 3.5) ? COLOR_B : COLOR_B;
-                            cell.right = COLOR_A;
-                            cell.bottom = (j < 3.5) ? COLOR_A : COLOR_A;
-                            cell.left = COLOR_A;
-                        } else {
-                            setSolidCell(i, j, COLOR_B); // Sky
-                        }
-
-                    } else { // Bottom row of the 2-cell unit
-                        // This row is the full base of the goose
-                        setSolidCell(i, j, COLOR_A); // Goose
-                    }
-                }
-            }
-        }
-        
-        /** Clears the grid and applies the Shoofly pattern (9-patch derivative with HST sides). */
-        function shooflyPattern() {
-            initializeGrid();
-            const D = 2; // 2 cells wide for borders (rows/cols 0-1, 2-5, 6-7)
-            
-            for (let i = 0; i < GRID_SIZE; i++) {
-                for (let j = 0; j < GRID_SIZE; j++) {
-                    const isBorderRow = i < D || i >= GRID_SIZE - D;
-                    const isBorderCol = j < D || j >= GRID_SIZE - D;
-
-                    // Corner and Center blocks are Solid Color A
-                    if ((isBorderRow && isBorderCol) || (!isBorderRow && !isBorderCol)) {
-                        setSolidCell(i, j, COLOR_A);
-                    } 
-                    // Side blocks are HSTs
-                    else {
-                        setHstCell(i, j, COLOR_A, COLOR_B, 'anti-diagonal'); // Simple diagonal split
-                    }
-                }
-            }
-        }
-
-        /** Clears the grid and applies the Village House pattern (simple silhouette). */
-        function villageHousePattern() {
-            initializeGrid();
-            const roofRows = 3; 
-            const doorCols = [3, 4];
-            const doorRows = [5, 6];
-            
-            for (let i = 0; i < GRID_SIZE; i++) {
-                for (let j = 0; j < GRID_SIZE; j++) {
-                    let color = COLOR_BACKGROUND;
-
-                    // 1. House Body (Bottom 5 rows, center 6 columns)
-                    const isBody = i >= roofRows && j >= 1 && j <= 6;
-                    if (isBody) {
-                        color = COLOR_A; // House Color
-                    }
-
-                    // 2. Roof (Top 3 rows, QSTs form a triangle)
-                    if (i < roofRows) {
-                        const jFromCenter = Math.abs(j - 3.5);
-                        // The roof gets wider as it goes down
-                        if (jFromCenter < (4 - i)) { 
-                            // Split QSTs to form a triangle silhouette (Color B)
-                            const cell = blockGrid[i][j];
-                            if (j < 3.5) { // Left half of roof
-                                cell.top = (i < 1) ? COLOR_B : COLOR_B;
-                                cell.right = COLOR_B;
-                                cell.bottom = COLOR_B;
-                                cell.left = COLOR_BACKGROUND;
-                            } else { // Right half of roof
-                                cell.top = (i < 1) ? COLOR_B : COLOR_B;
-                                cell.right = COLOR_BACKGROUND;
-                                cell.bottom = COLOR_B;
-                                cell.left = COLOR_B;
-                            }
-                            color = COLOR_B;
-                        } else {
-                            color = COLOR_BACKGROUND; // Sky
-                        }
-                    }
-
-                    // 3. Door (Foreground/Window)
-                    if (doorRows.includes(i) && doorCols.includes(j)) {
-                        color = COLOR_B; // Door/Window Color (Uses Color B)
-                    }
-
-                    // Apply the determined solid color if not QST-split already
-                    if (!blockGrid[i][j].top) { 
-                        setSolidCell(i, j, color);
-                    }
-                }
-            }
-        }
-
-        /** Helper function to call the pattern, clear the grid, and redraw the canvas. */
-        const populateGrid = (patternName) => {
-            const patternFunc = PATTERNS[patternName];
-            if (patternFunc) {
-                patternFunc();
-                window.draw(); 
-            } else {
-                console.error(`Pattern ${patternName} not found.`);
-            }
-        }
 
         // --- Firebase Persistence Functions ---
 
@@ -466,6 +282,7 @@
                 // Once loaded, set up controls and refresh canvas
                 setupControls(); 
                 updateSelectionDisplay();
+                updateGridDisplay(); // Initial grid display setup
                 if (window.draw) window.draw(); 
             }
         };
@@ -499,17 +316,39 @@
                 setupControls();
                 isPaletteLoaded = true;
                 updateSelectionDisplay();
+                updateGridDisplay();
             }
         };
 
 
         // --- P5.JS SETUP AND DRAW FUNCTIONS ---
+        
+        /** Recalculates canvas size and updates HTML/CSS wrappers for a fixed cell size model. */
+        const updateCanvasAndWrapperSizes = (newWidth, newHeight) => {
+            if (window.width !== newWidth || window.height !== newHeight) {
+                // Resize the p5.js canvas
+                resizeCanvas(newWidth, newHeight);
+            }
+
+            // Update the HTML container (#p5Canvas) to ensure proper layout
+            const p5CanvasWrapper = document.getElementById('p5Canvas');
+            p5CanvasWrapper.style.width = `${newWidth}px`;
+            p5CanvasWrapper.style.height = `${newHeight}px`;
+        };
+        
         window.setup = () => {
-            const canvas = createCanvas(CANVAS_SIZE, CANVAS_SIZE);
+            // Calculate initial canvas size based on fixed CELL_SIZE
+            const initialWidth = COLS * CELL_SIZE;
+            const initialHeight = ROWS * CELL_SIZE;
+
+            const canvas = createCanvas(initialWidth, initialHeight);
             canvas.parent('p5Canvas');
             initializeGrid();
             noStroke();
             
+            // Set the initial size of the wrappers
+            updateCanvasAndWrapperSizes(initialWidth, initialHeight);
+
             // Start Firebase setup and palette loading
             setupFirebase();
         };
@@ -540,54 +379,62 @@
 
         // --- HELPER FUNCTIONS ---
 
-        /** Initializes the 8x8 grid with default white QSTs. */
+        const createEmptyCell = () => ({ top: 0, right: 0, bottom: 0, left: 0 });
+
+        /** Initializes the grid with default white QSTs. */
         const initializeGrid = () => {
             blockGrid = [];
-            for (let i = 0; i < GRID_SIZE; i++) {
+            for (let i = 0; i < ROWS; i++) {
                 blockGrid[i] = [];
-                for (let j = 0; j < GRID_SIZE; j++) {
-                    blockGrid[i][j] = { top: 0, right: 0, bottom: 0, left: 0 };
+                for (let j = 0; j < COLS; j++) {
+                    blockGrid[i][j] = createEmptyCell();
                 }
             }
         };
 
         /** Draws the quilt block based on the current blockGrid state (now QSTs). */
         const drawGrid = () => {
-            for (let i = 0; i < GRID_SIZE; i++) {
-                for (let j = 0; j < GRID_SIZE; j++) {
-                    const x = j * CELL_SIZE;
-                    const y = i * CELL_SIZE;
+            const size = CELL_SIZE; 
+            
+            for (let i = 0; i < ROWS; i++) {
+                for (let j = 0; j < COLS; j++) {
+                    const x = j * size;
+                    const y = i * size;
+                    // Check if cell exists (should always exist if logic is sound)
+                    if (!blockGrid[i] || !blockGrid[i][j]) continue; 
+
                     const cell = blockGrid[i][j];
                     
-                    const cx = x + CELL_SIZE / 2;
-                    const cy = y + CELL_SIZE / 2;
+                    const cx = x + size / 2;
+                    const cy = y + size / 2;
                     
-                    // 1. Top QST
+                    // 1. Top QST (Corners: Top-Left, Top-Right, Center)
                     fill(PALETTE[cell.top]);
-                    triangle(x, y, x + CELL_SIZE, y, cx, cy);
+                    triangle(x, y, x + size, y, cx, cy);
                     
-                    // 2. Right QST
+                    // 2. Right QST (Corners: Top-Right, Bottom-Right, Center)
                     fill(PALETTE[cell.right]);
-                    triangle(x + CELL_SIZE, y, x + CELL_SIZE, y + CELL_SIZE, cx, cy);
+                    triangle(x + size, y, x + size, y + size, cx, cy);
                     
-                    // 3. Bottom QST
+                    // 3. Bottom QST (Corners: Bottom-Right, Bottom-Left, Center)
                     fill(PALETTE[cell.bottom]);
-                    triangle(x + CELL_SIZE, y + CELL_SIZE, x, y + CELL_SIZE, cx, cy);
+                    triangle(x + size, y + size, x, y + size, cx, cy);
                     
-                    // 4. Left QST
+                    // 4. Left QST (Corners: Bottom-Left, Top-Left, Center)
                     fill(PALETTE[cell.left]);
-                    triangle(x, y + CELL_SIZE, x, y, cx, cy);
+                    triangle(x, y + size, x, y, cx, cy);
                     
                     // Add grid lines for visibility
                     stroke(50, 50);
                     strokeWeight(1);
-                    line(x + CELL_SIZE, y, x + CELL_SIZE, y + CELL_SIZE);
-                    line(x, y + CELL_SIZE, x + CELL_SIZE, y + CELL_SIZE);
+                    // Cell boundaries
+                    line(x + size, y, x + size, y + size);
+                    line(x, y + size, x + size, y + size);
 
                     // Draw the internal QST lines (diagonals)
                     stroke(50, 50);
-                    line(x, y, x + CELL_SIZE, y + CELL_SIZE);
-                    line(x + CELL_SIZE, y, x, y + CELL_SIZE);
+                    line(x, y, x + size, y + size); // Main diagonal
+                    line(x + size, y, x, y + size); // Anti-diagonal
                     
                     noStroke();
                 }
@@ -595,44 +442,45 @@
         };
 
         /** Applies the current action (paint or clear) to the specific QST triangle at coordinates (x, y). */
-        const applyPatternAt = (x, y) => {
-            if (x >= 0 && x < CANVAS_SIZE && y >= 0 && y < CANVAS_SIZE) {
-                const col = floor(x / CELL_SIZE);
-                const row = floor(y / CELL_SIZE);
+        window.applyPatternAt = (x, y) => {
+            if (x >= 0 && x < width && y >= 0 && y < height) {
+                const size = CELL_SIZE;
 
-                if (row >= 0 && row < GRID_SIZE && col >= 0 && col < GRID_SIZE) {
+                const col = floor(x / size);
+                const row = floor(y / size);
+
+                if (row >= 0 && row < ROWS && col >= 0 && col < COLS) {
                     
-                    const rx = x - col * CELL_SIZE;
-                    const ry = y - row * CELL_SIZE;
+                    const rx = x - col * size; // Relative X within the cell
+                    const ry = y - row * size; // Relative Y within the cell
                     
                     let triangleKey = null;
 
-                    const belowMainDiagonal = ry > rx; 
-                    const belowAntiDiagonal = ry > CELL_SIZE - rx; 
+                    // Click detection based on QST geometry (from cell center to corners)
+                    const isBelowMainDiagonal = ry > rx; 
+                    const isBelowAntiDiagonal = ry > size - rx; 
 
-                    if (!belowMainDiagonal) { 
-                        if (!belowAntiDiagonal) {
-                            triangleKey = 'top'; 
-                        } else {
-                            triangleKey = 'right'; 
-                        }
-                    } else { 
-                        if (!belowAntiDiagonal) {
-                            triangleKey = 'left'; 
-                        } else {
-                            triangleKey = 'bottom'; 
-                        }
+                    if (!isBelowMainDiagonal && !isBelowAntiDiagonal) { 
+                        triangleKey = 'top'; 
+                    } else if (isBelowMainDiagonal && !isBelowAntiDiagonal) {
+                        triangleKey = 'left'; 
+                    } else if (isBelowMainDiagonal && isBelowAntiDiagonal) {
+                        triangleKey = 'bottom'; 
+                    } else if (!isBelowMainDiagonal && isBelowAntiDiagonal) {
+                        triangleKey = 'right'; 
                     }
                     
                     let colorIndex;
+                    // Right-click uses color index 0 (white/erase)
                     if (mouseButton === RIGHT) {
                         colorIndex = 0; 
                     } else {
                         colorIndex = currentColorIndex;
                     }
 
-                    if (triangleKey) {
+                    if (triangleKey && blockGrid[row][col][triangleKey] !== colorIndex) {
                         blockGrid[row][col][triangleKey] = colorIndex;
+                        window.draw(); // Redraw immediately on change
                     }
                 }
             }
@@ -652,6 +500,113 @@
 
         /** Disables the context menu (right-click menu) to allow for right-click clearing. */
         document.addEventListener('contextmenu', event => event.preventDefault());
+        
+        // --- GRID ADJUSTMENT FUNCTIONS ---
+
+        /** Updates the display text for row and column counts and manages button disabled state. */
+        const updateGridDisplay = () => {
+            // Update counts in the left panel
+            document.getElementById('rowCountDisplay').textContent = ROWS;
+            document.getElementById('colCountDisplay').textContent = COLS;
+
+            // Manage button states (ROWS)
+            const rowButtons = ['addRowTop', 'removeRowTop', 'addRowBottom', 'removeRowBottom'];
+            rowButtons.forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.disabled = (ROWS >= MAX_GRID && id.startsWith('add')) || (ROWS <= MIN_GRID && id.startsWith('remove'));
+            });
+
+            // Manage button states (COLS)
+            const colButtons = ['addColLeft', 'removeColLeft', 'addRowRight', 'removeRowRight']; // RowRight buttons correspond to ColRight operations
+            colButtons.forEach(id => {
+                 const btn = document.getElementById(id);
+                if (btn) btn.disabled = (COLS >= MAX_GRID && id.startsWith('add')) || (COLS <= MIN_GRID && id.startsWith('remove'));
+            });
+        };
+        
+        // Adjusts the number of rows from the TOP (uses unshift/shift)
+        const adjustRowsTop = (delta) => {
+            const newRows = ROWS + delta;
+            if (newRows < MIN_GRID || newRows > MAX_GRID) return;
+
+            if (delta > 0) {
+                // Add new row to the top
+                blockGrid.unshift(Array.from({ length: COLS }, createEmptyCell));
+            } else if (delta < 0) {
+                // Remove row from the top
+                blockGrid.shift(); 
+            }
+            ROWS = newRows;
+            
+            // Recalculate and resize the canvas and wrappers
+            updateCanvasAndWrapperSizes(COLS * CELL_SIZE, ROWS * CELL_SIZE);
+            updateGridDisplay();
+            window.draw();
+        };
+
+        // Adjusts the number of rows from the BOTTOM (uses push/pop)
+        const adjustRowsBottom = (delta) => {
+            const newRows = ROWS + delta;
+            if (newRows < MIN_GRID || newRows > MAX_GRID) return;
+
+            if (delta > 0) {
+                // Add new row to the bottom
+                blockGrid.push(Array.from({ length: COLS }, createEmptyCell));
+            } else if (delta < 0) {
+                // Remove row from the bottom
+                blockGrid.pop(); 
+            }
+            ROWS = newRows;
+            
+            // Recalculate and resize the canvas and wrappers
+            updateCanvasAndWrapperSizes(COLS * CELL_SIZE, ROWS * CELL_SIZE);
+            updateGridDisplay();
+            window.draw();
+        };
+
+        // Adjusts the number of columns from the LEFT (uses unshift/shift on each row)
+        const adjustColsLeft = (delta) => {
+            const newCols = COLS + delta;
+            if (newCols < MIN_GRID || newCols > MAX_GRID) return;
+
+            blockGrid.forEach(row => {
+                if (delta > 0) {
+                    // Add new column to the left (unshift)
+                    row.unshift(createEmptyCell());
+                } else if (delta < 0) {
+                    // Remove column from the left (shift)
+                    row.shift(); 
+                }
+            });
+            COLS = newCols;
+
+            // Recalculate and resize the canvas and wrappers
+            updateCanvasAndWrapperSizes(COLS * CELL_SIZE, ROWS * CELL_SIZE);
+            updateGridDisplay();
+            window.draw();
+        };
+        
+        // Adjusts the number of columns from the RIGHT (uses push/pop on each row)
+        const adjustColsRight = (delta) => {
+            const newCols = COLS + delta;
+            if (newCols < MIN_GRID || newCols > MAX_GRID) return;
+
+            blockGrid.forEach(row => {
+                if (delta > 0) {
+                    // Add new column to the right (push)
+                    row.push(createEmptyCell());
+                } else if (delta < 0) {
+                    // Remove column from the right (pop)
+                    row.pop(); 
+                }
+            });
+            COLS = newCols;
+
+            // Recalculate and resize the canvas and wrappers
+            updateCanvasAndWrapperSizes(COLS * CELL_SIZE, ROWS * CELL_SIZE);
+            updateGridDisplay();
+            window.draw();
+        };
 
 
         // --- UI CONTROL FUNCTIONS ---
@@ -682,44 +637,32 @@
             });
         };
 
-        /** Sets up event listeners for color controls, pattern presets, and utility buttons. */
+        /** Sets up event listeners for color controls, and utility buttons. */
         const setupControls = () => {
             const paletteDiv = document.getElementById('colorPalette');
             const editorDiv = document.getElementById('colorEditor');
-            const presetsDiv = document.getElementById('patternPresets');
             
             paletteDiv.innerHTML = '';
             editorDiv.innerHTML = '';
-            presetsDiv.innerHTML = '';
-
-            // 1. Pattern Presets Setup
-            Object.keys(PATTERNS).forEach(name => {
-                const btn = document.createElement('button');
-                btn.className = 'preset-btn';
-                btn.textContent = name;
-                btn.addEventListener('click', () => populateGrid(name));
-                presetsDiv.appendChild(btn);
-            });
             
-            // 2. Color Palette Selector Setup and Custom Color Input Setup
+            // 1. Color Palette Selector Setup and Custom Color Input Setup
             PALETTE.forEach((color, index) => {
                 if (index === 0) return; // Skip white (index 0)
 
                 const keyDisplay = index === 10 ? '0' : index; // '0' for index 10
 
-                // --- Selector Button (Smaller size and includes number label) ---
+                // --- Selector Button ---
                 const btn = document.createElement('button');
                 btn.className = `color-option h-8 w-8 rounded-full cursor-pointer transition transform hover:scale-110 border-2 border-white shadow-md text-xs font-bold flex items-center justify-center relative`; 
                 btn.style.backgroundColor = color;
                 btn.dataset.colorIndex = index;
                 btn.title = `Select Color ${index} (Key ${keyDisplay})`;
 
-                // Add label element inside the button
                 const label = document.createElement('span');
                 label.className = `text-white drop-shadow-sm pointer-events-none`; 
                 label.textContent = keyDisplay;
                 
-                btn.appendChild(label); // Append the label to the button
+                btn.appendChild(label); 
 
                 btn.addEventListener('click', () => {
                     currentColorIndex = index;
@@ -739,22 +682,17 @@
                     const newColor = e.target.value;
                     const colorIndex = parseInt(e.target.dataset.colorIndex);
                     
-                    // 1. Update the global PALETTE array
                     PALETTE[colorIndex] = newColor;
                     
-                    // 2. Update the appearance of the selection button
                     const selectButton = document.querySelector(`.color-option[data-color-index="${colorIndex}"]`);
                     if (selectButton) {
                         selectButton.style.backgroundColor = newColor;
                     }
 
-                    // 3. Update display and redraw canvas
                     if (currentColorIndex === colorIndex) {
                         updateSelectionDisplay();
                     }
                     window.draw(); 
-                    
-                    // 4. Persist the change
                     savePalette();
                 });
                 editorDiv.appendChild(editorInput);
@@ -766,11 +704,24 @@
                 initialSelectionBtn.classList.add('selected');
             }
             
-            // 3. Clear All Button
+            // 2. Clear All Button
             document.getElementById('clearAll').addEventListener('click', () => {
                 initializeGrid();
                 window.draw();
             });
+            
+            // 3. Grid Controls Setup
+            // Rows
+            document.getElementById('addRowTop').addEventListener('click', () => adjustRowsTop(1));
+            document.getElementById('removeRowTop').addEventListener('click', () => adjustRowsTop(-1));
+            document.getElementById('addRowBottom').addEventListener('click', () => adjustRowsBottom(1));
+            document.getElementById('removeRowBottom').addEventListener('click', () => adjustRowsBottom(-1));
+
+            // Columns (Right buttons perform 'Right' adjustments, Left buttons perform 'Left' adjustments)
+            document.getElementById('addRowRight').addEventListener('click', () => adjustColsRight(1));
+            document.getElementById('removeRowRight').addEventListener('click', () => adjustColsRight(-1));
+            document.getElementById('addColLeft').addEventListener('click', () => adjustColsLeft(1));
+            document.getElementById('removeColLeft').addEventListener('click', () => adjustColsLeft(-1));
         };
 
     </script>
