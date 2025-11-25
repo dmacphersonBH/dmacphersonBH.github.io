@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generative Growth Sketch</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <style>
+        /* CSS to ensure full screen, no borders, no scrollbars */
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevents scrollbars */
+            background-color: #000; /* Default background before sketch loads */
+        }
+        canvas {
+            display: block; /* Removes default inline spacing */
+        }
+    </style>
+</head>
+<body>
+    <script>
+        // --- YOUR SKETCH CODE BELOW ---
+
+        var r = 5;
+        var k = 10;
+        var grid = [];
+        var w = r / Math.sqrt(2);
+
+        // --- PALETTES ---
+        var palettes = [
+          { name: "Deep Ocean", bg: "#001f3f", colors: ["#7FDBFF", "#0074D9", "#39CCCC", "#B10DC9"] },
+          { name: "Sunset", bg: "#2D142C", colors: ["#EE4540", "#C72C41", "#801336", "#510A32", "#E01A4F"] },
+          { name: "Mystic Forest", bg: "#1A2F1A", colors: ["#558B2F", "#8BC34A", "#C5E1A5", "#DCE775", "#AED581"] },
+          { name: "Galactic Void", bg: "#0B0C10", colors: ["#66FCF1", "#45A29E", "#C5C6C7", "#1F2833", "#E3E2DF"] },
+          { name: "Molten Core", bg: "#100000", colors: ["#FF4500", "#FF8C00", "#FFA500", "#FFD700", "#E63946"] },
+          { name: "Royal Velvet", bg: "#240046", colors: ["#7B2CBF", "#9D4EDD", "#C77DFF", "#E0AAFF", "#5A189A"] },
+          { name: "Autumn Dusk", bg: "#2C1A1D", colors: ["#D35400", "#E67E22", "#F39C12", "#8E44AD", "#C0392B"] },
+          { name: "Abyss Glow", bg: "#000000", colors: ["#00FA9A", "#00CED1", "#20B2AA", "#5F9EA0", "#48D1CC"] },
+          { name: "Electric Storm", bg: "#2C3E50", colors: ["#F1C40F", "#ECF0F1", "#E74C3C", "#3498DB", "#BDC3C7"] },
+          { name: "Night City", bg: "#0F0F1B", colors: ["#F72585", "#7209B7", "#3A0CA3", "#4CC9F0", "#4895EF"] }
+        ];
+
+        var currentColors = [];
+        var currentBg = "#FFFFFF";
+        var paletteIndex = 0; 
+        var colorIndex = 0;   
+
+        var blobSize = 10000; 
+        var growSpeed = 20;   
+
+        var activeList = [];
+        var orderedList = [];
+        var blobLocationX = [];
+        var blobLocationY = [];
+        var blobColor = [];
+        var blobCount = 0;
+
+        var cols, rows;
+
+        // Increased max blobs slightly to account for the extra inner-seeds
+        var maxBlobs = 15;        
+        var isFinished = false;   
+        var finishTime = 0;       
+        var pauseDuration = 3000; 
+
+        function setup() {
+          createCanvas(windowWidth, windowHeight);
+          colorMode(HSB, 100);
+          
+          cols = floor(width / w);
+          rows = floor(height / w);
+          
+          initSketch();
+        }
+
+        function initSketch() {
+          // 1. Setup Palette
+          var p = palettes[paletteIndex];
+          currentBg = p.bg;
+          currentColors = p.colors;
+          console.log("Cycle " + (paletteIndex+1) + ": " + p.name);
+          paletteIndex = (paletteIndex + 1) % palettes.length;
+
+          background(currentBg);
+          strokeWeight(4);
+          
+          grid = new Array(cols * rows).fill(undefined);
+          activeList = [];
+          orderedList = [];
+          blobLocationX = [];
+          blobLocationY = [];
+          blobColor = [];
+          blobCount = 0;
+          colorIndex = 0;
+          isFinished = false;
+
+          // 2. CREATE OBSTACLES AND FIND TEXT BOUNDS
+          var pg = createGraphics(width, height);
+          pg.pixelDensity(1); 
+          pg.background(0);
+          pg.fill(255);
+          pg.noStroke();
+          pg.textSize(min(width, height) * 0.30); // Made text slightly larger
+          pg.textAlign(CENTER, CENTER);
+          pg.textStyle(BOLD);
+          pg.textFont('Arial'); 
+          pg.text("iHUB", width / 2, height / 2);
+          
+          pg.loadPixels();
+          
+          // Variables to track the bounding box of the text
+          var minX = width;
+          var maxX = 0;
+          var minY = height;
+          var maxY = 0;
+          
+          for (var c = 0; c < cols; c++) {
+            for (var r = 0; r < rows; r++) {
+              var x = floor(c * w);
+              var y = floor(r * w);
+              var index = (x + y * width) * 4;
+              
+              // If pixel is White -> It's the text -> Obstacle
+              if (pg.pixels[index] > 128) {
+                grid[c + r * cols] = createVector(x, y);
+                
+                // Update bounding box
+                if (c < minX) minX = c;
+                if (c > maxX) maxX = c;
+                if (r < minY) minY = r;
+                if (r > maxY) maxY = r;
+              }
+            }
+          }
+          
+          pg.remove();
+
+          // 3. TARGETED SPAWNING
+          // Collect all empty grid spots strictly INSIDE the text bounding box.
+          // This includes gaps between letters and holes inside 'B', 'P', 'O', etc.
+          var innerGaps = [];
+          
+          // We expand the bounds slightly to ensure we catch edges
+          for (var c = minX; c <= maxX; c++) {
+            for (var r = minY; r <= maxY; r++) {
+              var idx = c + r * cols;
+              if (!grid[idx]) {
+                innerGaps.push({x: c * w, y: r * w});
+              }
+            }
+          }
+
+          // Randomly spawn 8 blobs specifically in these gaps
+          // This guarantees seeds land inside the holes of the B
+          if (innerGaps.length > 0) {
+            for (var i = 0; i < 8; i++) {
+              var pt = random(innerGaps);
+              spawnBlob(pt.x, pt.y);
+            }
+          }
+        }
+
+        function draw() {
+          if (isFinished) {
+            if (millis() - finishTime > pauseDuration) {
+              initSketch(); 
+            }
+            return; 
+          }
+
+          // Auto-spawn remaining blobs randomly
+          if (blobCount < maxBlobs && frameCount % 10 === 0) {
+            spawnBlob(random(width), random(height));
+          }
+
+          var totalActivePoints = 0;
+
+          for (var i = 0; i < blobCount; i++) {
+            if (activeList[i].length > 0) {
+              blobGrowth(
+                blobLocationX[i],
+                blobLocationY[i],
+                blobColor[i],
+                activeList[i],
+                orderedList[i]
+              );
+            }
+            totalActivePoints += activeList[i].length;
+          }
+
+          if (blobCount >= maxBlobs && totalActivePoints === 0) {
+            isFinished = true;
+            finishTime = millis();
+            console.log("Screen full. Resetting...");
+          }
+        }
+
+        function spawnBlob(x, y) {
+          var pos = createVector(x, y);
+          var newActive = [];
+          var newOrdered = [];
+          
+          var _i = floor(x / w);
+          var _j = floor(y / w);
+          
+          // Only spawn if within bounds and NOT an obstacle
+          if (_i >= 0 && _j >= 0 && _i < cols && _j < rows && !grid[_i + _j * cols]) {
+            grid[_i + _j * cols] = pos;
+            newActive.push(pos);
+            newOrdered.push(pos);
+            
+            blobLocationX.push(x);
+            blobLocationY.push(y);
+            blobColor.push(currentColors[colorIndex]);
+            
+            activeList.push(newActive);
+            orderedList.push(newOrdered);
+            
+            blobCount++;
+            colorIndex++;
+            if (colorIndex >= currentColors.length) colorIndex = 0;
+          }
+        }
+
+        function blobGrowth(x, y, strokeColor, active, ordered) {
+          for (var total = 0; total < growSpeed; total++) {
+            if (active.length > 0 && ordered.length < blobSize) {
+              var randIndex = floor(random(active.length));
+              var position = active[randIndex];
+              var found = false;
+              
+              for (var n = 0; n < k; n++) {
+                var sample = p5.Vector.random2D();
+                var m = random(r, 2 * r);
+                sample.setMag(m);
+                sample.add(position);
+
+                var col = floor(sample.x / w);
+                var row = floor(sample.y / w);
+
+                if (
+                  col > -1 &&
+                  row > -1 &&
+                  col < cols &&
+                  row < rows &&
+                  !grid[col + row * cols]
+                ) {
+                  var ok = true;
+                  for (var i = -1; i <= 1; i++) {
+                    for (var j = -1; j <= 1; j++) {
+                      var index = col + i + (row + j) * cols;
+                      var neighbor = grid[index];
+                      if (neighbor) {
+                        var d = p5.Vector.dist(sample, neighbor);
+                        if (d < r) {
+                          ok = false;
+                        }
+                      }
+                    }
+                  }
+                  if (ok) {
+                    found = true;
+                    grid[col + row * cols] = sample;
+                    active.push(sample);
+                    ordered.push(sample);
+                    
+                    stroke(strokeColor);
+                    strokeWeight(r * 0.5);
+                    point(position.x, position.y); 
+                    line(sample.x, sample.y, position.x, position.y); 
+                    
+                    break;
+                  }
+                }
+              }
+              
+              if (!found) {
+                active.splice(randIndex, 1);
+              }
+            }
+          }
+        }
+        
+        // Added resize handler to ensure it stays full screen if window changes
+        function windowResized() {
+          resizeCanvas(windowWidth, windowHeight);
+          cols = floor(width / w);
+          rows = floor(height / w);
+          initSketch();
+        }
+    </script>
+</body>
+</html>
