@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>iHUB Sketch 9: Random Palette</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+  <style>
+    body, html { margin: 0; padding: 0; overflow: hidden; background: #000; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script>
+// --- PALETTE DEFINITIONS ---
+var palettes = [
+  { name: "Deep Ocean", bg: "#001f3f", colors: ["#7FDBFF", "#0074D9", "#39CCCC", "#B10DC9"] },
+  { name: "Sunset", bg: "#2D142C", colors: ["#EE4540", "#C72C41", "#801336", "#510A32", "#E01A4F"] },
+  { name: "Mystic Forest", bg: "#1A2F1A", colors: ["#558B2F", "#8BC34A", "#C5E1A5", "#DCE775", "#AED581"] },
+  { name: "Galactic Void", bg: "#0B0C10", colors: ["#66FCF1", "#45A29E", "#C5C6C7", "#1F2833", "#E3E2DF"] },
+  { name: "Molten Core", bg: "#100000", colors: ["#FF4500", "#FF8C00", "#FFA500", "#FFD700", "#E63946"] },
+  { name: "Royal Velvet", bg: "#240046", colors: ["#7B2CBF", "#9D4EDD", "#C77DFF", "#E0AAFF", "#5A189A"] },
+  { name: "Autumn Dusk", bg: "#2C1A1D", colors: ["#D35400", "#E67E22", "#F39C12", "#8E44AD", "#C0392B"] },
+  { name: "Abyss Glow", bg: "#000000", colors: ["#00FA9A", "#00CED1", "#20B2AA", "#5F9EA0", "#48D1CC"] },
+  { name: "Electric Storm", bg: "#2C3E50", colors: ["#F1C40F", "#ECF0F1", "#E74C3C", "#3498DB", "#BDC3C7"] },
+  { name: "Night City", bg: "#0F0F1B", colors: ["#F72585", "#7209B7", "#3A0CA3", "#4CC9F0", "#4895EF"] }
+];
+
+// --- CONFIGURATION ---
+var numParticles = 3500;
+var noiseScale = 0.002; 
+var flowSpeed = 1.5;
+
+// --- TURBULENCE ---
+var calmMult = 1.0;      
+var chaosMult = 8.0;     
+
+// --- TIME ---
+var zOff = 0;
+var zIncrement = 0.003;
+
+// --- GLOBALS ---
+var pg; 
+var particles = [];
+var currentPalette;
+var bgCol;
+var particleColors = [];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  
+  // 1. PICK RANDOM PALETTE
+  var theme = random(palettes);
+  console.log("Current Theme:", theme.name); // Check console to see which one it picked
+  
+  // Convert hex strings to p5 Color objects
+  bgCol = color(theme.bg);
+  particleColors = theme.colors.map(c => color(c));
+
+  // 2. CREATE MAP
+  pg = createGraphics(width, height);
+  pg.pixelDensity(1);
+  // Important: The map logic relies on Black/White contrast.
+  // We draw this off-screen, so it doesn't matter what the "visible" colors are.
+  pg.background(0); 
+  pg.fill(255);     
+  pg.noStroke();
+  pg.textAlign(CENTER, CENTER);
+  pg.textStyle(BOLD);
+  pg.textFont('Arial Black', 'Impact');
+  pg.textSize(min(width, height) * 0.9);
+  pg.text("iHUB", width / 2, height / 2+50);
+  pg.filter(BLUR, 6); 
+  pg.loadPixels(); 
+
+  // 3. SPAWN PARTICLES
+  for (var i = 0; i < numParticles; i++) {
+    particles[i] = new Particle();
+  }
+  
+  // Set initial background
+  background(bgCol);
+}
+
+function draw() {
+  // Fading Logic:
+  // Instead of hardcoded white or black, we use the CURRENT background color
+  // with low opacity. This creates trails that fade into the theme's background.
+  noStroke();
+  
+  // Extract RGB from the theme background and add Alpha (30/255)
+  fill(red(bgCol), green(bgCol), blue(bgCol), 10); 
+  rect(0, 0, width, height);
+
+  zOff += zIncrement;
+
+  for (var i = 0; i < particles.length; i++) {
+    particles[i].run();
+  }
+}
+
+class Particle {
+  constructor() {
+    this.reset();
+  }
+
+  reset() {
+    this.pos = createVector(random(width), random(height));
+    this.vel = createVector(0, 0);
+    this.acc = createVector(0, 0);
+    this.maxSpeed = flowSpeed; 
+    this.prevPos = this.pos.copy();
+    this.isTurbulent = false;
+    
+    // Pick a random color from the current theme
+    this.col = random(particleColors);
+    
+    // Lifespan to prevent bald spots
+    this.life = random(200, 400); 
+  }
+
+  run() {
+    this.follow();
+    this.update();
+    this.show();
+    this.checkStatus();
+  }
+
+  follow() {
+    // 1. Check Map
+    var ix = floor(this.pos.x);
+    var iy = floor(this.pos.y);
+    var multiplier = calmMult;
+    this.isTurbulent = false;
+
+    if (ix >= 0 && ix < width && iy >= 0 && iy < height) {
+      var index = (ix + iy * width) * 4;
+      var brightness = pg.pixels[index]; 
+      
+      if (brightness > 20) {
+        multiplier = map(brightness, 20, 255, calmMult, chaosMult);
+        this.isTurbulent = true;
+      }
+    }
+
+    // 2. Noise Force
+    var n = noise(this.pos.x * noiseScale, this.pos.y * noiseScale, zOff);
+    var angle = n * TWO_PI * multiplier;
+    var force = p5.Vector.fromAngle(angle);
+    
+    force.setMag(this.isTurbulent ? 0.8 : 0.5); 
+    this.acc.add(force);
+  }
+
+  update() {
+    this.vel.add(this.acc);
+    this.vel.limit(this.maxSpeed);
+    this.pos.add(this.vel);
+    this.acc.mult(0);
+    this.life -= 1;
+  }
+
+  show() {
+    // Draw using the theme color
+    stroke(this.col);
+    
+    if (this.isTurbulent) {
+        strokeWeight(3); 
+        // Optional: Make it slightly more transparent inside turbulence to see layers
+        stroke(red(this.col), green(this.col), blue(this.col), 200);
+    } else {
+        strokeWeight(3);
+        stroke(red(this.col), green(this.col), blue(this.col), 150);
+    }
+
+    line(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
+    
+    this.prevPos.x = this.pos.x;
+    this.prevPos.y = this.pos.y;
+  }
+
+  checkStatus() {
+    if (this.life < 0) this.reset();
+    
+    if (this.pos.x > width) this.pos.x = 0;
+    if (this.pos.x < 0)     this.pos.x = width;
+    if (this.pos.y > height)this.pos.y = 0;
+    if (this.pos.y < 0)     this.pos.y = height;
+    
+    if (this.pos.dist(this.prevPos) > 50) {
+        this.prevPos.x = this.pos.x;
+        this.prevPos.y = this.pos.y;
+    }
+  }
+}
+
+function windowResized() {
+  // Reloading ensures the background resets correctly
+  location.reload();
+}
+</script>
+</body>
+</html>

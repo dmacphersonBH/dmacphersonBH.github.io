@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>iHUB Display</title>
+  <style>
+    body, html { 
+      margin: 0; 
+      padding: 0; 
+      overflow: hidden; 
+      background: #000; 
+    }
+    iframe {
+      width: 100vw;
+      height: 100vh;
+      border: none;
+      display: block;
+      transition: opacity 0.5s ease;
+      /* PRO TIP: This makes the iframe ignore mouse clicks, 
+         ensuring the main page keeps focus so keys always work. */
+      pointer-events: none; 
+    }
+  </style>
+</head>
+<body>
+
+  <iframe id="sketchFrame" src="sketch1.html"></iframe>
+
+  <script>
+    // --- CONFIGURATION ---
+    const sketches = [
+      "sketch1.html",
+      "sketch2.html",
+      "sketch3.html"
+      // Add more file names here as you create them
+    ];
+    const duration = 30000; // 60 seconds per sketch
+
+    // --- STATE ---
+    let currentIndex = 0;
+    let rotationTimer; // We store the timer here so we can reset it
+
+    // --- FUNCTION TO SWAP SKETCHES ---
+    function rotateSketch() {
+      // 1. Update Index
+      currentIndex = (currentIndex + 1) % sketches.length;
+      
+      const frame = document.getElementById('sketchFrame');
+      
+      // 2. Fade Out
+      frame.style.opacity = 0;
+      
+      // 3. Swap Source after short delay (for fade effect)
+      setTimeout(() => {
+        frame.src = sketches[currentIndex];
+        
+        // 4. Fade In once loaded
+        frame.onload = () => {
+          frame.style.opacity = 1;
+        };
+      }, 500);
+    }
+
+    // --- TIMER MANAGEMENT ---
+    function startTimer() {
+      // Clear any existing timer first to avoid duplicates
+      if (rotationTimer) clearInterval(rotationTimer);
+      // Start a new timer
+      rotationTimer = setInterval(rotateSketch, duration);
+    }
+
+    // --- KEYBOARD CONTROLS ---
+    document.addEventListener('keydown', function(event) {
+      // Check for Spacebar (Space), Right Arrow, or Enter
+      if (event.code === 'Space' || event.code === 'ArrowRight' || event.code === 'Enter') {
+        console.log("Manual Advance Triggered");
+        rotateSketch(); // Switch immediately
+        startTimer();   // Reset the 60-second countdown
+      }
+    });
+
+    // --- INITIALIZATION ---
+    // Start the timer when the page loads
+    startTimer();
+
+  </script>
+</body>
+</html>

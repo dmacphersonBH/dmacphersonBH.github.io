@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>iHUB Sketch 3: Negative Space (Glitch Fix)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+  <style>
+    body, html { margin: 0; padding: 0; overflow: hidden; background: #000; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script>
+// --- PALETTES ---
+var palettes = [
+  { name: "Deep Ocean", bg: "#001f3f", colors: ["#7FDBFF", "#0074D9", "#39CCCC", "#B10DC9"] },
+  { name: "Sunset", bg: "#2D142C", colors: ["#EE4540", "#C72C41", "#801336", "#510A32", "#E01A4F"] },
+  { name: "Mystic Forest", bg: "#1A2F1A", colors: ["#558B2F", "#8BC34A", "#C5E1A5", "#DCE775", "#AED581"] },
+  { name: "Galactic Void", bg: "#0B0C10", colors: ["#66FCF1", "#45A29E", "#C5C6C7", "#1F2833", "#E3E2DF"] },
+  { name: "Molten Core", bg: "#100000", colors: ["#FF4500", "#FF8C00", "#FFA500", "#FFD700", "#E63946"] },
+  { name: "Royal Velvet", bg: "#240046", colors: ["#7B2CBF", "#9D4EDD", "#C77DFF", "#E0AAFF", "#5A189A"] },
+  { name: "Autumn Dusk", bg: "#2C1A1D", colors: ["#D35400", "#E67E22", "#F39C12", "#8E44AD", "#C0392B"] },
+  { name: "Abyss Glow", bg: "#000000", colors: ["#00FA9A", "#00CED1", "#20B2AA", "#5F9EA0", "#48D1CC"] },
+  { name: "Electric Storm", bg: "#2C3E50", colors: ["#F1C40F", "#ECF0F1", "#E74C3C", "#3498DB", "#BDC3C7"] },
+  { name: "Night City", bg: "#0F0F1B", colors: ["#F72585", "#7209B7", "#3A0CA3", "#4CC9F0", "#4895EF"] }
+];
+
+// --- CONFIGURATION ---
+var cellSize = 50;       
+var foldSpeed = 0.12;    
+var waveTightness = 30;  
+var holdDuration = 1.5;  
+
+// --- GLOBALS ---
+var grid = [];
+var cols, rows;
+var pg; 
+var currentPalette;
+var bgCol;
+var themeColors;
+
+// --- STATE MACHINE ---
+var startTime;
+var maxWaveDelay = 0; 
+var state = 'IN'; 
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  colorMode(HSB, 360, 100, 100, 100);
+  
+  cols = ceil(width / cellSize);
+  rows = ceil(height / cellSize);
+  maxWaveDelay = (cols + rows) / waveTightness;
+
+  generateTextMap();
+  resetCycle();
+}
+
+function generateTextMap() {
+  pg = createGraphics(width, height);
+  pg.pixelDensity(1);
+  pg.background(0);
+  pg.fill(255);
+  pg.noStroke();
+  pg.textAlign(CENTER, CENTER);
+  pg.textStyle(BOLD);
+  pg.textFont('Arial Black', 'Impact');
+  pg.textSize(min(width, height) * 0.9); 
+  pg.text("iHUB", width / 2, height / 2 + 40);
+  pg.loadPixels();
+}
+
+function resetCycle() {
+  var theme = random(palettes);
+  bgCol = color(theme.bg);
+  themeColors = theme.colors.map(c => color(c));
+  
+  background(bgCol);
+  startTime = millis();
+  state = 'IN';
+
+  grid = [];
+  for (let c = 0; c < cols; c++) {
+    for (let r = 0; r < rows; r++) {
+      let x = c * cellSize;
+      let y = r * cellSize;
+      
+      let cx = x + cellSize/2;
+      let cy = y + cellSize/2;
+      let inText = false;
+      let pixelIndex = (floor(cx) + floor(cy) * width) * 4;
+      
+      if (pixelIndex < pg.pixels.length && pg.pixels[pixelIndex] > 128) {
+        inText = true;
+      }
+      
+      grid.push(new HST(cx, cy, c, r, inText));
+    }
+  }
+}
+
+function draw() {
+  background(bgCol);
+
+  let t = (millis() - startTime) / 1000;
+
+  // --- STATE LOGIC ---
+  if (state === 'IN') {
+    if (t > maxWaveDelay + 0.5) { 
+        state = 'HOLD_IN'; 
+        startTime = millis(); 
+        t = 0; // Fix glitch
+    }
+  } 
+  else if (state === 'HOLD_IN') {
+    if (t > holdDuration) { 
+        state = 'OUT'; 
+        startTime = millis(); 
+        t = 0; // CRITICAL FIX: Reset t immediately so we don't use old time with new state
+    }
+  }
+  else if (state === 'OUT') {
+    if (t > maxWaveDelay + 0.5) { 
+        state = 'HOLD_OUT'; 
+        startTime = millis(); 
+        t = 0; // Fix glitch
+    }
+  }
+  else if (state === 'HOLD_OUT') {
+    if (t > 0.2) { resetCycle(); }
+  }
+
+  for (let tile of grid) {
+    tile.update(t, state);
+    tile.display();
+  }
+}
+
+class HST {
+  constructor(x, y, col, row, inText) {
+    this.x = x;
+    this.y = y;
+    this.col = col;
+    this.row = row;
+    this.inText = inText;
+    
+    this.scale = 0; 
+    
+    // Wave Delays
+    this.inDelay = (col + row) / waveTightness;
+    var maxDist = cols + rows;
+    var myDist = col + row;
+    this.outDelay = (maxDist - myDist) / waveTightness;
+
+    this.rotation = random([0, HALF_PI, PI, 3*HALF_PI]);
+
+    // Color Logic
+    if (this.inText) {
+      this.c1 = bgCol;
+      this.c2 = bgCol;
+    } else {
+      this.c1 = random(themeColors);
+      if (random() > 0.3) {
+        this.c2 = random(themeColors);
+      } else {
+        this.c2 = bgCol; 
+      }
+    }
+  }
+
+  update(t, currentState) {
+    // Select delay based on direction
+    var activeDelay = (currentState === 'IN' || currentState === 'HOLD_IN') ? this.inDelay : this.outDelay;
+
+    if (t > activeDelay) {
+        if (currentState === 'IN' || currentState === 'HOLD_IN') {
+            this.scale += foldSpeed;
+        } else if (currentState === 'OUT' || currentState === 'HOLD_OUT') {
+            this.scale -= foldSpeed;
+        }
+        this.scale = constrain(this.scale, 0, 1);
+    }
+  }
+
+  display() {
+    if (this.scale <= 0.01) return; 
+
+    push();
+    translate(this.x, this.y);
+    rotate(this.rotation);
+    scale(this.scale); 
+    
+    noStroke();
+    let s = cellSize;
+
+    fill(this.c1);
+    triangle(-s/2, -s/2, s/2, -s/2, -s/2, s/2);
+
+    fill(this.c2);
+    triangle(s/2, s/2, -s/2, s/2, s/2, -s/2);
+
+    pop();
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  cols = ceil(width / cellSize);
+  rows = ceil(height / cellSize);
+  maxWaveDelay = (cols + rows) / waveTightness;
+  generateTextMap();
+  resetCycle();
+}
+
+function mousePressed() {
+  state = 'HOLD_OUT'; 
+  startTime = millis() + 1000; 
+}
+</script>
+</body>
+</html>
