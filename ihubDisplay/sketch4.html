@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>iHUB Sketch 4: Idle Breath</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+  <style>
+    body, html { margin: 0; padding: 0; overflow: hidden; background: #000; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script>
+// --- CONFIGURATION ---
+var numLines = 40;       // How many horizontal lines
+var amplitude = 30;      // Height of the waves
+var noiseScale = 0.005;  // Smoothness of the curves
+var speed = 0.002;       // VERY slow movement
+var duration = 15000;    // How long this idle state lasts (15 seconds)
+
+// --- GLOBALS ---
+var startMillis;
+var pg; // Buffer for the text mask
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  colorMode(HSB, 360, 100, 100, 100);
+  pixelDensity(1);
+  
+  startMillis = millis();
+
+  // Create the "iHUB" text buffer once
+  pg = createGraphics(width, height);
+  pg.pixelDensity(1);
+  pg.textAlign(CENTER, CENTER);
+  pg.textStyle(BOLD);
+  pg.textFont('Arial Black', 'Impact');
+  pg.textSize(min(width, height) * 0.7);
+  
+  // Draw the text stroke (The glowing outline)
+  pg.noFill();
+  pg.stroke(255, 30); // White, very transparent
+  pg.strokeWeight(2);
+  pg.text("iHUB", width / 2, height / 2 + 40);
+}
+
+function draw() {
+  background(220, 40, 5); // Very deep, dark blue background
+  noFill();
+
+  // Calculate time
+  let t = millis() * speed;
+  let elapsed = millis() - startMillis;
+
+  // 1. DRAW THE WAVES
+  strokeWeight(1.5);
+  
+  for (let i = 0; i < numLines; i++) {
+    // Distribute lines vertically
+    let yBase = map(i, 0, numLines, height * 0.2, height * 0.8);
+    
+    // Color Gradient (Teal to Purple)
+    let hueVal = map(i, 0, numLines, 160, 280);
+    // Add subtle brightness pulsing
+    let briVal = map(sin(t + i*0.5), -1, 1, 40, 80);
+    
+    stroke(hueVal, 60, briVal, 80);
+
+    beginShape();
+    // Draw vertices across the screen width
+    for (let x = 0; x <= width; x += 20) { // Step by 20px for performance
+      // Mix Perlin noise (organic) with Sine (rhythmic)
+      let n = noise(x * noiseScale, i * 0.1, t);
+      let s = sin(x * 0.002 + t * 2);
+      
+      let yOffset = (n * amplitude) + (s * amplitude * 0.5);
+      
+      // Taper the edges so lines fade in/out at left/right of screen
+      let edgeFactor = 1;
+      if (x < 200) edgeFactor = map(x, 0, 200, 0, 1);
+      if (x > width - 200) edgeFactor = map(x, width-200, width, 1, 0);
+      
+      vertex(x, yBase + (yOffset * edgeFactor));
+    }
+    endShape();
+  }
+
+  // 2. DRAW THE TEXT MASK
+  // This draws the faint outline we created in setup
+  image(pg, 0, 0);
+
+  // 3. DRAW SOLID BLACK TEXT
+  // This "cuts out" the lines behind the text for readability
+  // We do this directly here instead of using the buffer for crispness
+  noStroke();
+  fill(220, 40, 5); // Match background color exactly
+  textAlign(CENTER, CENTER);
+  textStyle(BOLD);
+  textFont('Arial Black', 'Impact');
+  textSize(min(width, height) * 0.7);
+  // Using blendMode to ensure it punches through if needed, 
+  // but standard fill usually works best for "Negative Space"
+  text("iHUB", width / 2, height / 2 + 40);
+
+
+  // 4. CHECK FOR EXIT
+  if (elapsed > duration) {
+    window.parent.postMessage('nextSketch', '*');
+    noLoop();
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  setup(); // Re-create text buffer
+}
+</script>
+</body>
+</html>
