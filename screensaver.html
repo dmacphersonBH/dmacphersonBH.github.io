@@ -2,178 +2,102 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>iHUB Sketch 4: Optimized CRT Bouncer (Pi Edition)</title>
+  <title>iHUB Sketch 4: Infinite Silence</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
   <style>
-    body, html { 
-      margin: 0; 
-      padding: 0; 
-      /* Set background to black immediately for no flicker */
-      background: #000; 
-    }
-    
-    /* --- CRT GLOW & HARDWARE ACCELERATION --- */
-    canvas { 
-      display: block;
-      /* GPU Acceleration Hints */
-      will-change: transform; 
-      transform: translateZ(0);
-      /* Removed the blur filter for better Pi performance */
-    }
-
-    /* --- SCANLINE OVERLAY (Zero JS Overhead) --- */
-    #scanlines {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      /* Creates a repeating pattern of transparent and semi-transparent black lines */
-      background: linear-gradient(
-        to bottom,
-        rgba(255,255,255,0),
-        rgba(255,255,255,0) 50%,
-        rgba(0,0,0,0.2) 50%,
-        rgba(0,0,0,0.2)
-      );
-      background-size: 100% 4px; /* Controls the thickness/spacing of scanlines */
-      pointer-events: none; /* Allows canvas interaction underneath */
-      z-index: 10;
-    }
+    body, html { margin: 0; padding: 0; overflow: hidden; background: #000; }
+    canvas { display: block; }
   </style>
 </head>
 <body>
-
-  <div id="scanlines"></div>
-
 <script>
 // --- CONFIGURATION ---
-var speed = 5.0;        // Movement speed
-var logoScale = 0.25;    // Size of text relative to screen height
+var numLines = 60;       // Higher number = sharper text definition
+var amplitude = 30;      // Height of the waves
+var noiseScale = 0.005;  // Zoom level of the noise
+var speed = 0.0001;       // Speed of the flow
 
 // --- GLOBALS ---
-var dvdLogo;            // The graphics buffer holding the text
-var pos;                // Position Vector
-var vel;                // Velocity Vector
-var logoW, logoH;       // Dimensions
-var currentColor;
-var palette;
+var pg; 
 
 function setup() {
-  // Use a fixed size if you know your Pi's screen resolution, otherwise, keep window dimensions
-  createCanvas(windowWidth, windowHeight); 
-  
-  // Set background to black once in setup
-  background(0);
-  
+  createCanvas(windowWidth, windowHeight);
+  colorMode(GRAY, 255); // Greyscale Mode
   pixelDensity(1);
-  colorMode(HSB, 360, 100, 100, 100);
   
-  // Retro/Terminal Palette for vibrant color changes
-  palette = [
-    color(120, 100, 100), // Phosphor Green
-    color(60, 100, 100),  // Amber Monitor
-    color(180, 100, 100), // Cyan
-    color(300, 100, 100), // Hot Pink
-    color(240, 100, 100)  // Bright Blue
-  ];
+  // 1. CREATE THE INVISIBLE MAP
+  pg = createGraphics(width, height);
+  pg.pixelDensity(1);
+  pg.background(0); // Black background
+  pg.fill(255);     // White Text
+  pg.noStroke();
+  pg.textAlign(CENTER, CENTER);
+  pg.textStyle(BOLD);
+  pg.textFont('sans-serif');
+  pg.textSize(min(width, height) * 0.75); // Large text
+  pg.text("iHUB", width / 2, height / 2 + 40);
   
-  pickNewColor();
-
-  // 1. CREATE THE LOGO BUFFER ONCE
-  var fontSize = height * logoScale;
-  textSize(fontSize);
-  textStyle(BOLD);
-  textFont('sans-serif');
-  
-  // Measure text to size the buffer
-  var tw = textWidth("iHUB");
-  // Calculate text height based on baseline/descender/ascender
-  var th = textAscent() + textDescent(); 
-  
-  logoW = tw;
-  logoH = th;
-  
-  dvdLogo = createGraphics(logoW, logoH);
-  dvdLogo.pixelDensity(1);
-  dvdLogo.noStroke();
-  // We use the same text alignment and size as the main canvas for consistency
-  dvdLogo.textAlign(LEFT, TOP);
-  dvdLogo.textSize(fontSize);
-  dvdLogo.textStyle(BOLD);
-  dvdLogo.textFont('sans-serif');
-  
-  // Draw text in White (we tint it later in draw())
-  dvdLogo.fill(255);
-  dvdLogo.text("iHUB", 0, 0);
-
-  // 2. INITIAL PHYSICS
-  pos = createVector(random(50, width - logoW - 50), random(50, height - logoH - 50));
-  
-  // Randomize initial direction
-  var dirX = random() > 0.5 ? speed : -speed;
-  var dirY = random() > 0.5 ? speed : -speed;
-  vel = createVector(dirX, dirY);
+  // Load pixels into memory so we can check them fast
+  pg.loadPixels();
 }
 
 function draw() {
-  // --- OPTIMIZATION: CLEAR SCREEN FOR NO TRAILS ---
-  // This is the single most efficient way to clear the canvas.
-  // It ensures no ghosting (trails) happens.
-  background(0);
+  background(20); // Dark Charcoal Background
+  noFill();
 
-  // 1. UPDATE PHYSICS
-  pos.add(vel);
+  // Time based on system clock
+  let t = millis() * speed;
 
-  // 2. BOUNDARY CHECKS (Bouncing)
-  var hit = false;
-
-  // Check X boundaries
-  if (pos.x + logoW >= width) {
-    pos.x = width - logoW;
-    vel.x *= -1;
-    hit = true;
-  }
-  else if (pos.x <= 0) {
-    pos.x = 0;
-    vel.x *= -1;
-    hit = true;
-  }
+  strokeWeight(1.5);
   
-  // Check Y boundaries
-  if (pos.y + logoH >= height) {
-    pos.y = height - logoH;
-    vel.y *= -1;
-    hit = true;
-  }
-  else if (pos.y <= 0) {
-    pos.y = 0;
-    vel.y *= -1;
-    hit = true;
-  }
+  for (let i = 0; i < numLines; i++) {
+    // Calculate the base Y position for this line
+    let yBase = map(i, 0, numLines, -height * 0.15, height );
+    
+    // Aesthetic: Lighter lines at bottom, darker at top
+    let lineBrightness = map(i, 0, numLines, 80, 200);
+    stroke(lineBrightness, 180);
 
-  // Change color on bounce
-  if (hit) pickNewColor();
+    beginShape();
+    
+    // Iterate across the width of the screen
+    for (let x = 0; x <= width; x += 10) { // Step by 10px
+      
+      // 1. CALCULATE THE WAVE (Noise + Sine)
+      let n = noise(x * noiseScale, i * 0.2, t);
+      let s = sin(x * 0.002 + t * 5);
+      let rawOffset = (n * amplitude) + (s * amplitude * 0.5);
 
-  // 3. DRAW LOGO
-  // Apply the color tint and draw the pre-rendered image buffer
-  tint(currentColor);
-  image(dvdLogo, pos.x, pos.y);
-}
+      // 2. CHECK THE MAP
+      let px = floor(x);
+      let py = floor(yBase);
+      
+      let textInfluence = 0; 
+      
+      // Look up the pixel brightness in our hidden buffer
+      if (px >= 0 && px < width && py >= 0 && py < height) {
+        let index = (px + py * width) * 4;
+        let brightness = pg.pixels[index]; 
+        
+        // Normalize 0-255 to 0.0-1.0
+        textInfluence = brightness / 255.0; 
+      }
 
-function pickNewColor() {
-  // Select a new color from the palette, avoiding the current color
-  var newCol = random(palette);
-  // Simple check to ensure a different color is picked
-  if (palette.length > 1) {
-    while (newCol === currentColor) {
-      newCol = random(palette);
+      // 3. APPLY LOGIC
+      // If we are IN text (Influence = 1), move offset to 0.
+      // If we are OUT of text (Influence = 0), keep offset as is.
+      let finalOffset = rawOffset * (1.0 - textInfluence);
+
+      vertex(x, yBase + finalOffset);
     }
+    endShape();
   }
-  currentColor = newCol;
 }
 
-// *** REMOVED windowResized() FUNCTION FOR STABILITY ***
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  setup(); // Re-generate map on resize to fit new screen
+}
 </script>
 </body>
 </html>
