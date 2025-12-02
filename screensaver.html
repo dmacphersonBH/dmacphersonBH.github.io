@@ -1,136 +1,91 @@
-<!DOCTYPE html>
+\<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>iHUB Sketch 4: Ultra Optimized</title>
+  <title>iHUB Sketch 4: Infinite Silence</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
   <style>
-    body, html { 
-      margin: 0; 
-      padding: 0; 
-      overflow: hidden; 
-      background: #000; 
-    }
-    canvas { 
-      display: block;
-      /* CSS scales the smaller canvas to fit the full screen */
-      width: 100vw;
-      height: 100vh; 
-      
-      /* GPU Hints */
-      image-rendering: auto;
-      will-change: transform;
-      transform: translateZ(0);
-    }
+    body, html { margin: 0; padding: 0; overflow: hidden; background: #000; }
+    canvas { display: block; }
   </style>
 </head>
 <body>
 <script>
 // --- CONFIGURATION ---
-var numLines = 45;       // Reduced slightly for performance
-var amplitude = 30;
-var noiseScale = 0.005;
-var speed = 0.0003;
-
-// PERFORMANCE SETTINGS
-var stepSize = 40;       // Large steps = fewer calculations (looks fine on 4k width)
-var internalScale = 0.5; // Render at 50% resolution, upscale via CSS
+var numLines = 60;       // Higher number = sharper text definition
+var amplitude = 30;      // Height of the waves
+var noiseScale = 0.005;  // Zoom level of the noise
+var speed = 0.0002;       // Speed of the flow
 
 // --- GLOBALS ---
 var pg; 
-var lineCache = []; 
-var realWidth, realHeight;
 
 function setup() {
-  // 1. RENDER AT LOWER RESOLUTION
-  // We create a canvas half the size of the window to save CPU/GPU
-  realWidth = windowWidth * internalScale;
-  realHeight = windowHeight * internalScale;
-  createCanvas(realWidth, realHeight);
+  createCanvas(windowWidth, windowHeight);
+  colorMode(GRAY, 255); // Greyscale Mode
+  pixelDensity(1);
   
-  // 2. LOCK FRAMERATE
-  // Consistency is better than high speed on RPi
-  frameRate(30); 
-
-  colorMode(GRAY, 255); 
-  pixelDensity(1); 
-  
-  // 3. GENERATE TEXT MAP (At lower res)
-  pg = createGraphics(realWidth, realHeight);
+  // 1. CREATE THE INVISIBLE MAP
+  pg = createGraphics(width, height);
   pg.pixelDensity(1);
-  pg.background(0); 
-  pg.fill(255);     
+  pg.background(0); // Black background
+  pg.fill(255);     // White Text
   pg.noStroke();
   pg.textAlign(CENTER, CENTER);
   pg.textStyle(BOLD);
-  pg.textFont('Arial Black', 'Impact');
-  // Adjust text size for the scaled canvas
-  pg.textSize(min(realWidth, realHeight) * 0.75); 
-  pg.text("iHUB", realWidth / 2, realHeight / 2 + (20 * internalScale));
+  pg.textFont('sans-serif');
+  pg.textSize(min(width, height) * 0.75); // Large text
+  pg.text("iHUB", width / 2, height / 2 + 40);
   
+  // Load pixels into memory so we can check them fast
   pg.loadPixels();
-  
-  calculateCache();
-}
-
-function calculateCache() {
-  lineCache = [];
-  
-  for (let i = 0; i < numLines; i++) {
-    let rowData = [];
-    let yBase = map(i, 0, numLines, realHeight * 0.15, realHeight * 0.85);
-    let py = floor(yBase);
-
-    for (let x = 0; x <= realWidth; x += stepSize) {
-      let px = floor(x);
-      let influence = 0;
-
-      if (px >= 0 && px < realWidth && py >= 0 && py < realHeight) {
-        let index = (px + py * realWidth) * 4;
-        // Optimization: Just check if pixel is > 128 (Red channel)
-        if (pg.pixels[index] > 128) {
-            influence = 1.0;
-        }
-      }
-      rowData.push(influence);
-    }
-    lineCache.push(rowData);
-  }
 }
 
 function draw() {
-  background(20); 
+  background(20); // Dark Charcoal Background
   noFill();
 
+  // Time based on system clock
   let t = millis() * speed;
 
-  // Use a slightly thicker line since we are scaling up
-  strokeWeight(2); 
+  strokeWeight(1.5);
   
   for (let i = 0; i < numLines; i++) {
-    let yBase = map(i, 0, numLines, realHeight * 0.15, realHeight * 0.85);
+    // Calculate the base Y position for this line
+    let yBase = map(i, 0, numLines, 0, height );
     
+    // Aesthetic: Lighter lines at bottom, darker at top
     let lineBrightness = map(i, 0, numLines, 80, 200);
-    
-    // PERFORMANCE: Opaque Stroke
-    // Removed the alpha (transparency). Solid colors render much faster.
-    stroke(lineBrightness); 
+    stroke(lineBrightness, 180);
 
     beginShape();
     
-    let k = 0; 
-    
-    // IMPORTANT: Loop through the SCALED width
-    for (let x = 0; x <= realWidth; x += stepSize) { 
+    // Iterate across the width of the screen
+    for (let x = 0; x <= width; x += 10) { // Step by 10px
       
+      // 1. CALCULATE THE WAVE (Noise + Sine)
       let n = noise(x * noiseScale, i * 0.2, t);
       let s = sin(x * 0.002 + t * 5);
       let rawOffset = (n * amplitude) + (s * amplitude * 0.5);
 
-      // Read from Cache
-      let textInfluence = lineCache[i][k]; 
-      k++; 
+      // 2. CHECK THE MAP
+      let px = floor(x);
+      let py = floor(yBase);
+      
+      let textInfluence = 0; 
+      
+      // Look up the pixel brightness in our hidden buffer
+      if (px >= 0 && px < width && py >= 0 && py < height) {
+        let index = (px + py * width) * 4;
+        let brightness = pg.pixels[index]; 
+        
+        // Normalize 0-255 to 0.0-1.0
+        textInfluence = brightness / 255.0; 
+      }
 
+      // 3. APPLY LOGIC
+      // If we are IN text (Influence = 1), move offset to 0.
+      // If we are OUT of text (Influence = 0), keep offset as is.
       let finalOffset = rawOffset * (1.0 - textInfluence);
 
       vertex(x, yBase + finalOffset);
@@ -140,21 +95,8 @@ function draw() {
 }
 
 function windowResized() {
-  realWidth = windowWidth * internalScale;
-  realHeight = windowHeight * internalScale;
-  resizeCanvas(realWidth, realHeight);
-  
-  pg.resizeCanvas(realWidth, realHeight);
-  pg.background(0);
-  pg.fill(255);
-  pg.noStroke();
-  pg.textAlign(CENTER, CENTER);
-  pg.textStyle(BOLD);
-  pg.textSize(min(realWidth, realHeight) * 0.75); 
-  pg.text("iHUB", realWidth / 2, realHeight / 2 + (20 * internalScale));
-  pg.loadPixels();
-  
-  calculateCache();
+  resizeCanvas(windowWidth, windowHeight);
+  setup(); // Re-generate map on resize to fit new screen
 }
 </script>
 </body>
