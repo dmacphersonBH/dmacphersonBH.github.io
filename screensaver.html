@@ -1,103 +1,181 @@
-\<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>iHUB Sketch 4: Infinite Silence</title>
+  <title>iHUB Sketch 4: Optimized CRT Bouncer</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
   <style>
-    body, html { margin: 0; padding: 0; overflow: hidden; background: #000; }
-    canvas { display: block; }
+    body, html { 
+      margin: 0; 
+      padding: 0; 
+      overflow: hidden; 
+      background: #000; 
+    }
+    
+    /* --- CRT GLOW & HARDWARE ACCELERATION --- */
+    canvas { 
+      display: block;
+      /* GPU Acceleration Hints */
+      will-change: transform; 
+      transform: translateZ(0);
+      /* Add a slight blur/contrast for that glowy CRT look */
+      filter: blur(0.5px) contrast(1.2); 
+    }
+
+    /* --- SCANLINE OVERLAY (Zero JS Overhead) --- */
+    #scanlines {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      /* Creates a repeating pattern of transparent and semi-transparent black lines */
+      background: linear-gradient(
+        to bottom,
+        rgba(255,255,255,0),
+        rgba(255,255,255,0) 50%,
+        rgba(0,0,0,0.2) 50%,
+        rgba(0,0,0,0.2)
+      );
+      background-size: 100% 4px; /* Controls the thickness/spacing of scanlines */
+      pointer-events: none; /* Allows canvas interaction underneath */
+      z-index: 10;
+    }
   </style>
 </head>
 <body>
+
+  <!-- Overlay div for texture and scanlines -->
+  <div id="scanlines"></div>
+
 <script>
 // --- CONFIGURATION ---
-var numLines = 60;       // Higher number = sharper text definition
-var amplitude = 30;      // Height of the waves
-var noiseScale = 0.005;  // Zoom level of the noise
-var speed = 0.0002;       // Speed of the flow
+var speed = 2.0;        // SLOW movement speed for smoothness
+var logoScale = 0.5;    // Size of text relative to screen height
+var trailLength = 45;   // 0-255. Higher number = shorter trail (more defined).
 
 // --- GLOBALS ---
-var pg; 
+var dvdLogo;            // The graphics buffer holding the text
+var pos;                // Position Vector
+var vel;                // Velocity Vector
+var logoW, logoH;       // Dimensions
+var currentColor;
+var palette;
 
 function setup() {
-    frameRate(22);
   createCanvas(windowWidth, windowHeight);
-  colorMode(GRAY, 255); // Greyscale Mode
   pixelDensity(1);
+  colorMode(HSB, 360, 100, 100, 100);
   
-  // 1. CREATE THE INVISIBLE MAP
-  pg = createGraphics(width, height);
-  pg.pixelDensity(1);
-  pg.background(0); // Black background
-  pg.fill(255);     // White Text
-  pg.noStroke();
-  pg.textAlign(CENTER, CENTER);
-  pg.textStyle(BOLD);
-  pg.textFont('sans-serif');
-  pg.textSize(min(width, height) * 0.75); // Large text
-  pg.text("iHUB", width / 2, height / 2 + 40);
+  // Retro/Terminal Palette for vibrant color changes
+  palette = [
+    color(120, 100, 100), // Phosphor Green
+    color(60, 100, 100),  // Amber Monitor
+    color(180, 100, 100), // Cyan
+    color(300, 100, 100), // Hot Pink
+    color(240, 100, 100)  // Bright Blue
+  ];
   
-  // Load pixels into memory so we can check them fast
-  pg.loadPixels();
+  pickNewColor();
+
+  // 1. CREATE THE LOGO BUFFER ONCE (High Performance)
+  var fontSize = height * logoScale;
+  textSize(fontSize);
+  textStyle(BOLD);
+  // Using generic sans-serif for guaranteed compatibility on RPi OS
+  textFont('sans-serif');
+  
+  // Measure text to size the buffer
+  var tw = textWidth("iHUB");
+  var th = textAscent() + textDescent();
+  
+  logoW = tw + 20;
+  logoH = th + 20;
+  
+  dvdLogo = createGraphics(logoW, logoH);
+  dvdLogo.pixelDensity(1);
+  dvdLogo.noStroke();
+  dvdLogo.textAlign(LEFT, TOP);
+  dvdLogo.textSize(fontSize);
+  dvdLogo.textStyle(BOLD);
+  dvdLogo.textFont('sans-serif');
+  
+  // Draw text in White (we tint it later in draw())
+  dvdLogo.fill(255);
+  dvdLogo.text("iHUB", 0, 0);
+
+  // 2. INITIAL PHYSICS
+  pos = createVector(random(50, width - logoW - 50), random(50, height - logoH - 50));
+  
+  // Randomize initial direction
+  var dirX = random() > 0.5 ? speed : -speed;
+  var dirY = random() > 0.5 ? speed : -speed;
+  vel = createVector(dirX, dirY);
 }
 
 function draw() {
-  background(20); // Dark Charcoal Background
-  noFill();
+  // --- MOTION TRAILS LOGIC ---
+  // Draw a semi-transparent black rectangle over the screen.
+  // This fades the previous image to create the ghosting effect.
+  noStroke();
+  fill(0, trailLength); 
+  rect(0, 0, width, height);
 
-  // Time based on system clock
-  let t = millis() * speed;
+  // 1. UPDATE PHYSICS
+  pos.add(vel);
 
-  strokeWeight(1.5);
-  
-  for (let i = 0; i < numLines; i++) {
-    // Calculate the base Y position for this line
-    let yBase = map(i, 0, numLines, 0, height );
-    
-    // Aesthetic: Lighter lines at bottom, darker at top
-    let lineBrightness = map(i, 0, numLines, 80, 200);
-    stroke(lineBrightness, 180);
+  // 2. BOUNDARY CHECKS (Bouncing)
+  var hit = false;
 
-    beginShape();
-    
-    // Iterate across the width of the screen
-    for (let x = 0; x <= width; x += 10) { // Step by 10px
-      
-      // 1. CALCULATE THE WAVE (Noise + Sine)
-      let n = noise(x * noiseScale, i * 0.2, t);
-      let s = sin(x * 0.002 + t * 5);
-      let rawOffset = (n * amplitude) + (s * amplitude * 0.5);
-
-      // 2. CHECK THE MAP
-      let px = floor(x);
-      let py = floor(yBase);
-      
-      let textInfluence = 0; 
-      
-      // Look up the pixel brightness in our hidden buffer
-      if (px >= 0 && px < width && py >= 0 && py < height) {
-        let index = (px + py * width) * 4;
-        let brightness = pg.pixels[index]; 
-        
-        // Normalize 0-255 to 0.0-1.0
-        textInfluence = brightness / 255.0; 
-      }
-
-      // 3. APPLY LOGIC
-      // If we are IN text (Influence = 1), move offset to 0.
-      // If we are OUT of text (Influence = 0), keep offset as is.
-      let finalOffset = rawOffset * (1.0 - textInfluence);
-
-      vertex(x, yBase + finalOffset);
-    }
-    endShape();
+  // Check X boundaries
+  if (pos.x + logoW >= width) {
+    pos.x = width - logoW;
+    vel.x *= -1;
+    hit = true;
   }
+  else if (pos.x <= 0) {
+    pos.x = 0;
+    vel.x *= -1;
+    hit = true;
+  }
+  
+  // Check Y boundaries
+  if (pos.y + logoH >= height) {
+    pos.y = height - logoH;
+    vel.y *= -1;
+    hit = true;
+  }
+  else if (pos.y <= 0) {
+    pos.y = 0;
+    vel.y *= -1;
+    hit = true;
+  }
+
+  // Change color on bounce
+  if (hit) pickNewColor();
+
+  // 3. DRAW LOGO
+  // Apply the color tint and draw the pre-rendered image buffer
+  tint(currentColor);
+  image(dvdLogo, pos.x, pos.y);
+}
+
+function pickNewColor() {
+  // Select a new color from the palette, avoiding the current color
+  var newCol = random(palette);
+  // Simple check to ensure a different color is picked
+  if (palette.length > 1) {
+    while (newCol === currentColor) {
+      newCol = random(palette);
+    }
+  }
+  currentColor = newCol;
 }
 
 function windowResized() {
+  // Re-size and call setup() to re-calculate text size/buffer for new dimensions
   resizeCanvas(windowWidth, windowHeight);
-  setup(); // Re-generate map on resize to fit new screen
+  setup(); 
 }
 </script>
 </body>
