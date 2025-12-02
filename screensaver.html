@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+\<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>iHUB Sketch 4: Retro Bouncer</title>
+  <title>iHUB Sketch 4: The Bouncer</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
   <style>
     body, html { 
@@ -11,96 +11,71 @@
       overflow: hidden; 
       background: #000; 
     }
-    
-    /* --- CSS RETRO EFFECTS (GPU Accelerated) --- */
-    
-    /* 1. The Canvas container */
     canvas { 
       display: block;
+      /* GPU Acceleration Hints */
       will-change: transform; 
       transform: translateZ(0);
-      /* Add a slight blur for that glowy CRT look */
-      filter: blur(0.5px) contrast(1.2); 
-    }
-
-    /* 2. Scanline Overlay */
-    /* This sits on top of the canvas and adds lines without using JS */
-    #scanlines {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: linear-gradient(
-        to bottom,
-        rgba(255,255,255,0),
-        rgba(255,255,255,0) 50%,
-        rgba(0,0,0,0.2) 50%,
-        rgba(0,0,0,0.2)
-      );
-      background-size: 100% 4px; /* Thickness of scanlines */
-      pointer-events: none; /* Let clicks pass through */
-      z-index: 10;
     }
   </style>
 </head>
 <body>
-
-  <div id="scanlines"></div>
-
 <script>
 // --- CONFIGURATION ---
-var speed = 1.5;        // Slightly faster for retro arcade feel
-var logoScale = 0.5;    // Large text
-var trailLength = 40;   // 0-255. Lower number = Longer trails. Higher = Shorter.
+var speed = 3.0;        // How fast it moves
+var duration = 20000;   // 20 Seconds before switching
+var logoScale = 0.4;    // Size of text relative to screen height
 
 // --- GLOBALS ---
-var dvdLogo;            
-var pos;                
-var vel;                
-var logoW, logoH;       
+var dvdLogo;            // The image buffer
+var pos;                // Position Vector
+var vel;                // Velocity Vector
+var logoW, logoH;       // Dimensions
 var currentColor;
 var palette;
+var startTime;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
   pixelDensity(1);
   colorMode(HSB, 360, 100, 100, 100);
   
-  // Retro Terminal Palette
+  // Define vibrant colors (Neon Palette)
   palette = [
-    color(120, 100, 100), // Phosphor Green
-    color(60, 100, 100),  // Amber Monitor
+    color(300, 100, 100), // Magenta
     color(180, 100, 100), // Cyan
-    color(300, 100, 100), // Hot Pink
-    color(0, 0, 100)      // Pure White
+    color(60, 100, 100),  // Yellow
+    color(0, 100, 100),   // Red
+    color(120, 100, 100), // Green
+    color(280, 80, 100)   // Purple
   ];
   
   pickNewColor();
+  startTime = millis();
 
-  // 1. CREATE LOGO BUFFER
+  // 1. CREATE THE LOGO BUFFER ONCE
+  // Drawing an image is much faster for the Pi than drawing text every frame
   var fontSize = height * logoScale;
+  
+  // Measure text first to size the buffer correctly
   textSize(fontSize);
   textStyle(BOLD);
-  // Use Monospace for retro feel
-  textFont('Courier New', 'Courier', 'monospace');
-  
+  textFont('Arial Black', 'Impact');
   var tw = textWidth("iHUB");
   var th = textAscent() + textDescent();
   
+  // Pad the buffer slightly
   logoW = tw + 20;
   logoH = th + 20;
   
   dvdLogo = createGraphics(logoW, logoH);
   dvdLogo.pixelDensity(1);
   dvdLogo.noStroke();
+  dvdLogo.fill(255); // White (we will tint it later)
   dvdLogo.textAlign(LEFT, TOP);
   dvdLogo.textSize(fontSize);
   dvdLogo.textStyle(BOLD);
-  dvdLogo.textFont('Courier New', 'monospace');
-  
-  // Draw text in White (we tint later)
-  dvdLogo.fill(255);
+  dvdLogo.textFont('Arial Black', 'Impact');
   dvdLogo.text("iHUB", 0, 0);
 
   // 2. INITIAL PHYSICS
@@ -109,51 +84,62 @@ function setup() {
 }
 
 function draw() {
-  // --- RETRO TRAILS LOGIC ---
-  // Instead of background(0), we draw a semi-transparent black rect.
-  // This causes the previous frame to fade out slowly.
-  noStroke();
-  fill(0, trailLength); 
-  rect(0, 0, width, height);
+  // Clear background (Solid black is fastest)
+  background(0);
 
   // 1. UPDATE PHYSICS
   pos.add(vel);
 
-  // 2. BOUNDARY CHECKS
+  // 2. BOUNDARY CHECKS (Bouncing)
   var hit = false;
 
+  // Right Edge
   if (pos.x + logoW >= width) {
     pos.x = width - logoW;
     vel.x *= -1;
     hit = true;
   }
+  // Left Edge
   else if (pos.x <= 0) {
     pos.x = 0;
     vel.x *= -1;
     hit = true;
   }
   
+  // Bottom Edge
   if (pos.y + logoH >= height) {
     pos.y = height - logoH;
     vel.y *= -1;
     hit = true;
   }
+  // Top Edge
   else if (pos.y <= 0) {
     pos.y = 0;
     vel.y *= -1;
     hit = true;
   }
 
-  if (hit) pickNewColor();
+  // Change color on bounce
+  if (hit) {
+    pickNewColor();
+  }
 
-  // 3. DRAW LOGO
+  // 3. DRAW
+  // Tint the white logo to the current color
   tint(currentColor);
   image(dvdLogo, pos.x, pos.y);
-  
-  // (Exit logic removed for infinite loop)
+
+  // 4. CHECK EXIT TIMER
+  if (millis() - startTime > duration) {
+    if (window.parent) {
+       window.parent.postMessage('nextSketch', '*');
+       noLoop();
+    }
+  }
 }
 
 function pickNewColor() {
+  // Ensure we don't pick the exact same color twice
   var newCol = random(palette);
   while (newCol === currentColor) {
     newCol = random(palette);
@@ -163,6 +149,7 @@ function pickNewColor() {
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
+  // Re-initialize physics to ensure we aren't stuck outside bounds
   setup(); 
 }
 </script>
