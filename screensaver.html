@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>iHUB Sketch 4: Ultra Optimized</title>
+  <title>iHUB Sketch 4: The Bouncer</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
   <style>
     body, html { 
@@ -13,13 +13,8 @@
     }
     canvas { 
       display: block;
-      /* CSS scales the smaller canvas to fit the full screen */
-      width: 100vw;
-      height: 100vh; 
-      
-      /* GPU Hints */
-      image-rendering: auto;
-      will-change: transform;
+      /* GPU Acceleration Hints */
+      will-change: transform; 
       transform: translateZ(0);
     }
   </style>
@@ -27,134 +22,135 @@
 <body>
 <script>
 // --- CONFIGURATION ---
-var numLines = 45;       // Reduced slightly for performance
-var amplitude = 30;
-var noiseScale = 0.005;
-var speed = 0.0003;
-
-// PERFORMANCE SETTINGS
-var stepSize = 40;       // Large steps = fewer calculations (looks fine on 4k width)
-var internalScale = 0.5; // Render at 50% resolution, upscale via CSS
+var speed = 3.0;        // How fast it moves
+var duration = 20000;   // 20 Seconds before switching
+var logoScale = 0.4;    // Size of text relative to screen height
 
 // --- GLOBALS ---
-var pg; 
-var lineCache = []; 
-var realWidth, realHeight;
+var dvdLogo;            // The image buffer
+var pos;                // Position Vector
+var vel;                // Velocity Vector
+var logoW, logoH;       // Dimensions
+var currentColor;
+var palette;
+var startTime;
 
 function setup() {
-  // 1. RENDER AT LOWER RESOLUTION
-  // We create a canvas half the size of the window to save CPU/GPU
-  realWidth = windowWidth * internalScale;
-  realHeight = windowHeight * internalScale;
-  createCanvas(realWidth, realHeight);
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  colorMode(HSB, 360, 100, 100, 100);
   
-  // 2. LOCK FRAMERATE
-  // Consistency is better than high speed on RPi
-  frameRate(30); 
+  // Define vibrant colors (Neon Palette)
+  palette = [
+    color(300, 100, 100), // Magenta
+    color(180, 100, 100), // Cyan
+    color(60, 100, 100),  // Yellow
+    color(0, 100, 100),   // Red
+    color(120, 100, 100), // Green
+    color(280, 80, 100)   // Purple
+  ];
+  
+  pickNewColor();
+  startTime = millis();
 
-  colorMode(GRAY, 255); 
-  pixelDensity(1); 
+  // 1. CREATE THE LOGO BUFFER ONCE
+  // Drawing an image is much faster for the Pi than drawing text every frame
+  var fontSize = height * logoScale;
   
-  // 3. GENERATE TEXT MAP (At lower res)
-  pg = createGraphics(realWidth, realHeight);
-  pg.pixelDensity(1);
-  pg.background(0); 
-  pg.fill(255);     
-  pg.noStroke();
-  pg.textAlign(CENTER, CENTER);
-  pg.textStyle(BOLD);
-  pg.textFont('Arial Black', 'Impact');
-  // Adjust text size for the scaled canvas
-  pg.textSize(min(realWidth, realHeight) * 0.75); 
-  pg.text("iHUB", realWidth / 2, realHeight / 2 + (20 * internalScale));
+  // Measure text first to size the buffer correctly
+  textSize(fontSize);
+  textStyle(BOLD);
+  textFont('Arial Black', 'Impact');
+  var tw = textWidth("iHUB");
+  var th = textAscent() + textDescent();
   
-  pg.loadPixels();
+  // Pad the buffer slightly
+  logoW = tw + 20;
+  logoH = th + 20;
   
-  calculateCache();
-}
+  dvdLogo = createGraphics(logoW, logoH);
+  dvdLogo.pixelDensity(1);
+  dvdLogo.noStroke();
+  dvdLogo.fill(255); // White (we will tint it later)
+  dvdLogo.textAlign(LEFT, TOP);
+  dvdLogo.textSize(fontSize);
+  dvdLogo.textStyle(BOLD);
+  dvdLogo.textFont('Arial Black', 'Impact');
+  dvdLogo.text("iHUB", 0, 0);
 
-function calculateCache() {
-  lineCache = [];
-  
-  for (let i = 0; i < numLines; i++) {
-    let rowData = [];
-    let yBase = map(i, 0, numLines, realHeight * 0.15, realHeight * 0.85);
-    let py = floor(yBase);
-
-    for (let x = 0; x <= realWidth; x += stepSize) {
-      let px = floor(x);
-      let influence = 0;
-
-      if (px >= 0 && px < realWidth && py >= 0 && py < realHeight) {
-        let index = (px + py * realWidth) * 4;
-        // Optimization: Just check if pixel is > 128 (Red channel)
-        if (pg.pixels[index] > 128) {
-            influence = 1.0;
-        }
-      }
-      rowData.push(influence);
-    }
-    lineCache.push(rowData);
-  }
+  // 2. INITIAL PHYSICS
+  pos = createVector(random(100, width - logoW), random(100, height - logoH));
+  vel = createVector(speed, speed);
 }
 
 function draw() {
-  background(20); 
-  noFill();
+  // Clear background (Solid black is fastest)
+  background(0);
 
-  let t = millis() * speed;
+  // 1. UPDATE PHYSICS
+  pos.add(vel);
 
-  // Use a slightly thicker line since we are scaling up
-  strokeWeight(2); 
+  // 2. BOUNDARY CHECKS (Bouncing)
+  var hit = false;
+
+  // Right Edge
+  if (pos.x + logoW >= width) {
+    pos.x = width - logoW;
+    vel.x *= -1;
+    hit = true;
+  }
+  // Left Edge
+  else if (pos.x <= 0) {
+    pos.x = 0;
+    vel.x *= -1;
+    hit = true;
+  }
   
-  for (let i = 0; i < numLines; i++) {
-    let yBase = map(i, 0, numLines, realHeight * 0.15, realHeight * 0.85);
-    
-    let lineBrightness = map(i, 0, numLines, 80, 200);
-    
-    // PERFORMANCE: Opaque Stroke
-    // Removed the alpha (transparency). Solid colors render much faster.
-    stroke(lineBrightness); 
+  // Bottom Edge
+  if (pos.y + logoH >= height) {
+    pos.y = height - logoH;
+    vel.y *= -1;
+    hit = true;
+  }
+  // Top Edge
+  else if (pos.y <= 0) {
+    pos.y = 0;
+    vel.y *= -1;
+    hit = true;
+  }
 
-    beginShape();
-    
-    let k = 0; 
-    
-    // IMPORTANT: Loop through the SCALED width
-    for (let x = 0; x <= realWidth; x += stepSize) { 
-      
-      let n = noise(x * noiseScale, i * 0.2, t);
-      let s = sin(x * 0.002 + t * 5);
-      let rawOffset = (n * amplitude) + (s * amplitude * 0.5);
+  // Change color on bounce
+  if (hit) {
+    pickNewColor();
+  }
 
-      // Read from Cache
-      let textInfluence = lineCache[i][k]; 
-      k++; 
+  // 3. DRAW
+  // Tint the white logo to the current color
+  tint(currentColor);
+  image(dvdLogo, pos.x, pos.y);
 
-      let finalOffset = rawOffset * (1.0 - textInfluence);
-
-      vertex(x, yBase + finalOffset);
+  // 4. CHECK EXIT TIMER
+  if (millis() - startTime > duration) {
+    if (window.parent) {
+       window.parent.postMessage('nextSketch', '*');
+       noLoop();
     }
-    endShape();
   }
 }
 
+function pickNewColor() {
+  // Ensure we don't pick the exact same color twice
+  var newCol = random(palette);
+  while (newCol === currentColor) {
+    newCol = random(palette);
+  }
+  currentColor = newCol;
+}
+
 function windowResized() {
-  realWidth = windowWidth * internalScale;
-  realHeight = windowHeight * internalScale;
-  resizeCanvas(realWidth, realHeight);
-  
-  pg.resizeCanvas(realWidth, realHeight);
-  pg.background(0);
-  pg.fill(255);
-  pg.noStroke();
-  pg.textAlign(CENTER, CENTER);
-  pg.textStyle(BOLD);
-  pg.textSize(min(realWidth, realHeight) * 0.75); 
-  pg.text("iHUB", realWidth / 2, realHeight / 2 + (20 * internalScale));
-  pg.loadPixels();
-  
-  calculateCache();
+  resizeCanvas(windowWidth, windowHeight);
+  // Re-initialize physics to ensure we aren't stuck outside bounds
+  setup(); 
 }
 </script>
 </body>
