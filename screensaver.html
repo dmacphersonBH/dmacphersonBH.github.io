@@ -42,7 +42,7 @@ function setup() {
 }
 
 function draw() {
-  background(20); // Dark Charcoal Background
+  background(0); // Dark Charcoal Background
   noFill();
 
   // Time based on system clock
@@ -55,7 +55,7 @@ function draw() {
     let yBase = map(i, 0, numLines, -height * 0.15, height );
     
     // Aesthetic: Lighter lines at bottom, darker at top
-    let lineBrightness = map(i, 0, numLines, 10, 100);
+    let lineBrightness = map(i, 0, numLines, 30, 30);
     stroke(lineBrightness, 180);
 
     beginShape();
