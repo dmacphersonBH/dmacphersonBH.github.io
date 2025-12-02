@@ -2,90 +2,119 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>iHUB Sketch 4: Infinite Silence</title>
+  <title>iHUB Sketch 4: Infinite Silence (Optimized)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
   <style>
-    body, html { margin: 0; padding: 0; overflow: hidden; background: #000; }
-    canvas { display: block; }
+    body, html { 
+      margin: 0; 
+      padding: 0; 
+      overflow: hidden; 
+      background: #000; 
+    }
+    canvas { 
+      display: block; 
+      /* Force Hardware Acceleration on Raspberry Pi Chromium */
+      will-change: transform;
+      transform: translateZ(0);
+    }
   </style>
 </head>
 <body>
 <script>
 // --- CONFIGURATION ---
-var numLines = 60;       // Higher number = sharper text definition
-var amplitude = 30;      // Height of the waves
-var noiseScale = 0.005;  // Zoom level of the noise
-var speed = 0.0001;       // Speed of the flow
+var numLines = 60;       
+var amplitude = 30;      
+var noiseScale = 0.005;  
+var speed = 0.0003;      
+var stepSize = 15; // Increased from 10 to 15 to reduce vertex count (33% lighter)
 
 // --- GLOBALS ---
 var pg; 
+var lineCache = []; // Stores the text map so we don't look up pixels every frame
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
-  colorMode(GRAY, 255); // Greyscale Mode
-  pixelDensity(1);
+  colorMode(GRAY, 255); 
+  pixelDensity(1); 
   
   // 1. CREATE THE INVISIBLE MAP
   pg = createGraphics(width, height);
   pg.pixelDensity(1);
-  pg.background(0); // Black background
-  pg.fill(255);     // White Text
+  pg.background(0); 
+  pg.fill(255);     
   pg.noStroke();
   pg.textAlign(CENTER, CENTER);
   pg.textStyle(BOLD);
   pg.textFont('Arial Black', 'Impact');
-  pg.textSize(min(width, height) * 0.75); // Large text
+  pg.textSize(min(width, height) * 0.75); 
   pg.text("iHUB", width / 2, height / 2 + 40);
   
-  // Load pixels into memory so we can check them fast
-  pg.loadPixels();
+  pg.loadPixels(); // Lock pixels for reading
+
+  // 2. PRE-CALCULATE TEXT INFLUENCE (The Optimization)
+  // Instead of checking pixels every frame in draw(), we do it once here.
+  calculateCache();
+}
+
+function calculateCache() {
+  lineCache = []; // Reset cache
+  
+  for (let i = 0; i < numLines; i++) {
+    let rowData = [];
+    // Must use EXACTLY the same math here as in draw()
+    let yBase = map(i, 0, numLines, height * 0.15, height * 0.85);
+    let py = floor(yBase);
+
+    // Loop through the width just like we will in draw
+    for (let x = 0; x <= width; x += stepSize) {
+      let px = floor(x);
+      let influence = 0;
+
+      if (px >= 0 && px < width && py >= 0 && py < height) {
+        let index = (px + py * width) * 4;
+        let brightness = pg.pixels[index]; 
+        // 1.0 = Inside Text, 0.0 = Background
+        influence = brightness / 255.0; 
+      }
+      rowData.push(influence);
+    }
+    lineCache.push(rowData);
+  }
 }
 
 function draw() {
-  background(20); // Dark Charcoal Background
+  background(20); 
   noFill();
 
-  // Time based on system clock
   let t = millis() * speed;
 
   strokeWeight(1.5);
   
   for (let i = 0; i < numLines; i++) {
-    // Calculate the base Y position for this line
+    // Re-calculate yBase purely for drawing color/position
     let yBase = map(i, 0, numLines, height * 0.15, height * 0.85);
     
-    // Aesthetic: Lighter lines at bottom, darker at top
     let lineBrightness = map(i, 0, numLines, 80, 200);
     stroke(lineBrightness, 180);
 
     beginShape();
     
-    // Iterate across the width of the screen
-    for (let x = 0; x <= width; x += 10) { // Step by 10px
+    // We use a separate counter 'k' to access our cache array
+    let k = 0; 
+
+    for (let x = 0; x <= width; x += stepSize) { 
       
-      // 1. CALCULATE THE WAVE (Noise + Sine)
+      // 1. MATH (Still needs to happen every frame)
       let n = noise(x * noiseScale, i * 0.2, t);
       let s = sin(x * 0.002 + t * 5);
       let rawOffset = (n * amplitude) + (s * amplitude * 0.5);
 
-      // 2. CHECK THE MAP
-      let px = floor(x);
-      let py = floor(yBase);
-      
-      let textInfluence = 0; 
-      
-      // Look up the pixel brightness in our hidden buffer
-      if (px >= 0 && px < width && py >= 0 && py < height) {
-        let index = (px + py * width) * 4;
-        let brightness = pg.pixels[index]; 
-        
-        // Normalize 0-255 to 0.0-1.0
-        textInfluence = brightness / 255.0; 
-      }
+      // 2. READ CACHE (Instant lookup)
+      // Retrieves the pre-calculated 0.0 or 1.0
+      let textInfluence = lineCache[i][k]; 
+      k++; // Increment cache index
 
       // 3. APPLY LOGIC
-      // If we are IN text (Influence = 1), move offset to 0.
-      // If we are OUT of text (Influence = 0), keep offset as is.
       let finalOffset = rawOffset * (1.0 - textInfluence);
 
       vertex(x, yBase + finalOffset);
@@ -96,7 +125,18 @@ function draw() {
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
-  setup(); // Re-generate map on resize to fit new screen
+  // Re-draw text and re-calculate cache on resize
+  pg.resizeCanvas(width, height);
+  pg.background(0);
+  pg.fill(255);
+  pg.noStroke();
+  pg.textAlign(CENTER, CENTER);
+  pg.textStyle(BOLD);
+  pg.textSize(min(width, height) * 0.75); 
+  pg.text("iHUB", width / 2, height / 2 + 40);
+  pg.loadPixels();
+  
+  calculateCache();
 }
 </script>
 </body>
