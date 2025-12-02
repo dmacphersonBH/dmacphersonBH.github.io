@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>iHUB Sketch 4: Optimized CRT Bouncer</title>
+  <title>iHUB Sketch 4: Optimized CRT Bouncer (Pi Edition)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
   <style>
     body, html { 
       margin: 0; 
       padding: 0; 
-      overflow: hidden; 
+      /* Set background to black immediately for no flicker */
       background: #000; 
     }
     
@@ -18,8 +18,7 @@
       /* GPU Acceleration Hints */
       will-change: transform; 
       transform: translateZ(0);
-      /* Add a slight blur/contrast for that glowy CRT look */
-      filter: blur(0.5px) contrast(1.2); 
+      /* Removed the blur filter for better Pi performance */
     }
 
     /* --- SCANLINE OVERLAY (Zero JS Overhead) --- */
@@ -45,14 +44,12 @@
 </head>
 <body>
 
-  <!-- Overlay div for texture and scanlines -->
   <div id="scanlines"></div>
 
 <script>
 // --- CONFIGURATION ---
-var speed = 5.0;        // SLOW movement speed for smoothness
+var speed = 5.0;        // Movement speed
 var logoScale = 0.25;    // Size of text relative to screen height
-var trailLength = 45;   // 0-255. Higher number = shorter trail (more defined).
 
 // --- GLOBALS ---
 var dvdLogo;            // The graphics buffer holding the text
@@ -63,7 +60,12 @@ var currentColor;
 var palette;
 
 function setup() {
-  createCanvas(windowWidth, windowHeight);
+  // Use a fixed size if you know your Pi's screen resolution, otherwise, keep window dimensions
+  createCanvas(windowWidth, windowHeight); 
+  
+  // Set background to black once in setup
+  background(0);
+  
   pixelDensity(1);
   colorMode(HSB, 360, 100, 100, 100);
   
@@ -78,16 +80,16 @@ function setup() {
   
   pickNewColor();
 
-  // 1. CREATE THE LOGO BUFFER ONCE (High Performance)
+  // 1. CREATE THE LOGO BUFFER ONCE
   var fontSize = height * logoScale;
   textSize(fontSize);
   textStyle(BOLD);
-  // Using generic sans-serif for guaranteed compatibility on RPi OS
   textFont('sans-serif');
   
   // Measure text to size the buffer
   var tw = textWidth("iHUB");
-  var th = textAscent() + textDescent();
+  // Calculate text height based on baseline/descender/ascender
+  var th = textAscent() + textDescent(); 
   
   logoW = tw;
   logoH = th;
@@ -95,6 +97,7 @@ function setup() {
   dvdLogo = createGraphics(logoW, logoH);
   dvdLogo.pixelDensity(1);
   dvdLogo.noStroke();
+  // We use the same text alignment and size as the main canvas for consistency
   dvdLogo.textAlign(LEFT, TOP);
   dvdLogo.textSize(fontSize);
   dvdLogo.textStyle(BOLD);
@@ -114,12 +117,10 @@ function setup() {
 }
 
 function draw() {
-  // --- MOTION TRAILS LOGIC ---
-  // Draw a semi-transparent black rectangle over the screen.
-  // This fades the previous image to create the ghosting effect.
-  noStroke();
-  fill(0, trailLength); 
-  rect(0, 0, width, height);
+  // --- OPTIMIZATION: CLEAR SCREEN FOR NO TRAILS ---
+  // This is the single most efficient way to clear the canvas.
+  // It ensures no ghosting (trails) happens.
+  background(0);
 
   // 1. UPDATE PHYSICS
   pos.add(vel);
@@ -172,11 +173,7 @@ function pickNewColor() {
   currentColor = newCol;
 }
 
-function windowResized() {
-  // Re-size and call setup() to re-calculate text size/buffer for new dimensions
-  resizeCanvas(windowWidth, windowHeight);
-  setup(); 
-}
+// *** REMOVED windowResized() FUNCTION FOR STABILITY ***
 </script>
 </body>
 </html>
