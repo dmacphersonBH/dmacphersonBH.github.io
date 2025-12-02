@@ -55,7 +55,7 @@ function draw() {
     let yBase = map(i, 0, numLines, -height * 0.15, height );
     
     // Aesthetic: Lighter lines at bottom, darker at top
-    let lineBrightness = map(i, 0, numLines, 80, 200);
+    let lineBrightness = map(i, 0, numLines, 10, 100);
     stroke(lineBrightness, 180);
 
     beginShape();
