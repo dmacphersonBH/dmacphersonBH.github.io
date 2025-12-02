@@ -50,8 +50,8 @@
 
 <script>
 // --- CONFIGURATION ---
-var speed = 2.0;        // SLOW movement speed for smoothness
-var logoScale = 0.5;    // Size of text relative to screen height
+var speed = 5.0;        // SLOW movement speed for smoothness
+var logoScale = 0.25;    // Size of text relative to screen height
 var trailLength = 45;   // 0-255. Higher number = shorter trail (more defined).
 
 // --- GLOBALS ---
@@ -89,8 +89,8 @@ function setup() {
   var tw = textWidth("iHUB");
   var th = textAscent() + textDescent();
   
-  logoW = tw + 20;
-  logoH = th + 20;
+  logoW = tw;
+  logoH = th;
   
   dvdLogo = createGraphics(logoW, logoH);
   dvdLogo.pixelDensity(1);
