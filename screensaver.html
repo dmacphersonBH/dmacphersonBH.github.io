@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>iHUB Sketch 4: Infinite Silence (Optimized)</title>
+  <title>iHUB Sketch 4: Ultra Optimized</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
   <style>
     body, html { 
@@ -12,8 +12,13 @@
       background: #000; 
     }
     canvas { 
-      display: block; 
-      /* Force Hardware Acceleration on Raspberry Pi Chromium */
+      display: block;
+      /* CSS scales the smaller canvas to fit the full screen */
+      width: 100vw;
+      height: 100vh; 
+      
+      /* GPU Hints */
+      image-rendering: auto;
       will-change: transform;
       transform: translateZ(0);
     }
@@ -22,23 +27,36 @@
 <body>
 <script>
 // --- CONFIGURATION ---
-var numLines = 60;       
-var amplitude = 30;      
-var noiseScale = 0.005;  
-var speed = 0.0003;      
-var stepSize = 15; // Increased from 10 to 15 to reduce vertex count (33% lighter)
+var numLines = 45;       // Reduced slightly for performance
+var amplitude = 30;
+var noiseScale = 0.005;
+var speed = 0.0003;
+
+// PERFORMANCE SETTINGS
+var stepSize = 40;       // Large steps = fewer calculations (looks fine on 4k width)
+var internalScale = 0.5; // Render at 50% resolution, upscale via CSS
 
 // --- GLOBALS ---
 var pg; 
-var lineCache = []; // Stores the text map so we don't look up pixels every frame
+var lineCache = []; 
+var realWidth, realHeight;
 
 function setup() {
-  createCanvas(windowWidth, windowHeight);
+  // 1. RENDER AT LOWER RESOLUTION
+  // We create a canvas half the size of the window to save CPU/GPU
+  realWidth = windowWidth * internalScale;
+  realHeight = windowHeight * internalScale;
+  createCanvas(realWidth, realHeight);
+  
+  // 2. LOCK FRAMERATE
+  // Consistency is better than high speed on RPi
+  frameRate(30); 
+
   colorMode(GRAY, 255); 
   pixelDensity(1); 
   
-  // 1. CREATE THE INVISIBLE MAP
-  pg = createGraphics(width, height);
+  // 3. GENERATE TEXT MAP (At lower res)
+  pg = createGraphics(realWidth, realHeight);
   pg.pixelDensity(1);
   pg.background(0); 
   pg.fill(255);     
@@ -46,35 +64,33 @@ function setup() {
   pg.textAlign(CENTER, CENTER);
   pg.textStyle(BOLD);
   pg.textFont('Arial Black', 'Impact');
-  pg.textSize(min(width, height) * 0.75); 
-  pg.text("iHUB", width / 2, height / 2 + 40);
+  // Adjust text size for the scaled canvas
+  pg.textSize(min(realWidth, realHeight) * 0.75); 
+  pg.text("iHUB", realWidth / 2, realHeight / 2 + (20 * internalScale));
   
-  pg.loadPixels(); // Lock pixels for reading
-
-  // 2. PRE-CALCULATE TEXT INFLUENCE (The Optimization)
-  // Instead of checking pixels every frame in draw(), we do it once here.
+  pg.loadPixels();
+  
   calculateCache();
 }
 
 function calculateCache() {
-  lineCache = []; // Reset cache
+  lineCache = [];
   
   for (let i = 0; i < numLines; i++) {
     let rowData = [];
-    // Must use EXACTLY the same math here as in draw()
-    let yBase = map(i, 0, numLines, height * 0.15, height * 0.85);
+    let yBase = map(i, 0, numLines, realHeight * 0.15, realHeight * 0.85);
     let py = floor(yBase);
 
-    // Loop through the width just like we will in draw
-    for (let x = 0; x <= width; x += stepSize) {
+    for (let x = 0; x <= realWidth; x += stepSize) {
       let px = floor(x);
       let influence = 0;
 
-      if (px >= 0 && px < width && py >= 0 && py < height) {
-        let index = (px + py * width) * 4;
-        let brightness = pg.pixels[index]; 
-        // 1.0 = Inside Text, 0.0 = Background
-        influence = brightness / 255.0; 
+      if (px >= 0 && px < realWidth && py >= 0 && py < realHeight) {
+        let index = (px + py * realWidth) * 4;
+        // Optimization: Just check if pixel is > 128 (Red channel)
+        if (pg.pixels[index] > 128) {
+            influence = 1.0;
+        }
       }
       rowData.push(influence);
     }
@@ -88,33 +104,33 @@ function draw() {
 
   let t = millis() * speed;
 
-  strokeWeight(1.5);
+  // Use a slightly thicker line since we are scaling up
+  strokeWeight(2); 
   
   for (let i = 0; i < numLines; i++) {
-    // Re-calculate yBase purely for drawing color/position
-    let yBase = map(i, 0, numLines, height * 0.15, height * 0.85);
+    let yBase = map(i, 0, numLines, realHeight * 0.15, realHeight * 0.85);
     
     let lineBrightness = map(i, 0, numLines, 80, 200);
-    stroke(lineBrightness, 180);
+    
+    // PERFORMANCE: Opaque Stroke
+    // Removed the alpha (transparency). Solid colors render much faster.
+    stroke(lineBrightness); 
 
     beginShape();
     
-    // We use a separate counter 'k' to access our cache array
     let k = 0; 
-
-    for (let x = 0; x <= width; x += stepSize) { 
+    
+    // IMPORTANT: Loop through the SCALED width
+    for (let x = 0; x <= realWidth; x += stepSize) { 
       
-      // 1. MATH (Still needs to happen every frame)
       let n = noise(x * noiseScale, i * 0.2, t);
       let s = sin(x * 0.002 + t * 5);
       let rawOffset = (n * amplitude) + (s * amplitude * 0.5);
 
-      // 2. READ CACHE (Instant lookup)
-      // Retrieves the pre-calculated 0.0 or 1.0
+      // Read from Cache
       let textInfluence = lineCache[i][k]; 
-      k++; // Increment cache index
+      k++; 
 
-      // 3. APPLY LOGIC
       let finalOffset = rawOffset * (1.0 - textInfluence);
 
       vertex(x, yBase + finalOffset);
@@ -124,16 +140,18 @@ function draw() {
 }
 
 function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
-  // Re-draw text and re-calculate cache on resize
-  pg.resizeCanvas(width, height);
+  realWidth = windowWidth * internalScale;
+  realHeight = windowHeight * internalScale;
+  resizeCanvas(realWidth, realHeight);
+  
+  pg.resizeCanvas(realWidth, realHeight);
   pg.background(0);
   pg.fill(255);
   pg.noStroke();
   pg.textAlign(CENTER, CENTER);
   pg.textStyle(BOLD);
-  pg.textSize(min(width, height) * 0.75); 
-  pg.text("iHUB", width / 2, height / 2 + 40);
+  pg.textSize(min(realWidth, realHeight) * 0.75); 
+  pg.text("iHUB", realWidth / 2, realHeight / 2 + (20 * internalScale));
   pg.loadPixels();
   
   calculateCache();
