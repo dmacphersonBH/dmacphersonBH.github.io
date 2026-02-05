@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quilt Block Designer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.3/p5.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 2rem;
+            margin: 0;
+        }
+
+        /* --- FABRIC SWATCH STYLES --- */
+        .fabric-swatch {
+            width: 3.5rem;
+            height: 3.5rem;
+            border-radius: 0.5rem;
+            background-size: cover;
+            background-position: center;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.15s ease;
+            cursor: pointer;
+        }
+        .fabric-swatch.selected {
+            border: 3px solid #3b82f6;
+            transform: scale(1.1);
+            box-shadow: 0 0 0 2px white, 0 4px 6px rgba(0,0,0,0.2);
+        }
+
+        /* --- GRID CONTROL STYLES (From your uploaded file) --- */
+        #quiltGridContainer {
+            display: grid;
+            /* 3 Columns: Left Controls | Canvas | Right Controls */
+            grid-template-columns: auto 1fr auto; 
+            /* 3 Rows: Top Controls | Canvas Row | Bottom Controls */
+            grid-template-rows: auto 1fr auto; 
+            justify-items: center; 
+            align-items: center; 
+            gap: 10px;
+        }
+
+        /* Grid Areas */
+        #topRowControls { grid-column: 2 / 3; grid-row: 1 / 2; width: 100%; display: flex; justify-content: center; gap: 10px; padding-bottom: 10px;}
+        #bottomRowControls { grid-column: 2 / 3; grid-row: 3 / 4; width: 100%; display: flex; justify-content: center; gap: 10px; padding-top: 10px;}
+        #leftColControls { grid-column: 1 / 2; grid-row: 2 / 3; display: flex; flex-direction: column; gap: 10px; padding-right: 10px;}
+        #rightColControls { grid-column: 3 / 4; grid-row: 2 / 3; display: flex; flex-direction: column; gap: 10px; padding-left: 10px;}
+        #p5Canvas { grid-column: 2 / 3; grid-row: 2 / 3; box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2); border-radius: 0.5rem; overflow: hidden; border: 4px solid #2d3748;}
+
+        .grid-btn {
+            background-color: #2563eb; /* Blue-600 */
+            color: white;
+            font-weight: 800;
+            border-radius: 9999px;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            line-height: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: background 0.2s, transform 0.1s;
+            border: none;
+            cursor: pointer;
+        }
+        .grid-btn:hover { background-color: #1d4ed8; transform: scale(1.05); }
+        .grid-btn:active { transform: scale(0.95); }
+        .grid-control-wrapper {
+            background-color: #e5e7eb;
+            border-radius: 9999px;
+            padding: 4px;
+            display: inline-block;
+        }
+
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <div class="mx-auto flex flex-col lg:flex-row gap-8 bg-white p-8 rounded-xl shadow-2xl items-start max-w-7xl">
+        
+        <div class="lg:w-80 space-y-6 w-full flex-shrink-0"> 
+            <div class="border-b pb-4">
+                <h1 class="text-3xl font-bold text-gray-800">Quilt Block Designer</h1>
+                <p class="text-sm text-gray-500 mt-2"></p>
+            </div>
+
+            <div class="space-y-3">
+                <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500">Available Fabrics</h2>
+                <div id="swatchContainer" class="flex flex-wrap gap-3 min-h-[100px] p-1 bg-gray-50 rounded-lg border border-gray-100">
+                    <div id="loadingMsg" class="text-gray-400 text-sm italic p-4">Loading fabrics...</div>
+                </div>
+            </div>
+
+            <div class="bg-blue-50 p-4 rounded-lg border border-blue-200 text-xs text-blue-800 space-y-2">
+                <p><strong>Left-click:</strong> Apply selected fabric</p>
+                <p><strong>Right-click:</strong> Erase to White</p>
+            </div>
+            
+            <div class="pt-4 border-t border-gray-200 space-y-3">
+                <button id="exportPNG" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition shadow-lg">
+                    Download Block (PNG)
+                </button>
+                <button id="clearAll" class="w-full text-gray-400 hover:text-red-500 text-sm font-semibold transition">
+                    Reset Canvas
+                </button>
+            </div>
+        </div>
+
+        <div class="flex-grow flex justify-center bg-gray-50 p-8 rounded-xl border border-gray-200 shadow-inner overflow-auto">
+            
+            <div id="quiltGridContainer">
+                
+                <div id="topRowControls">
+                    <div class="grid-control-wrapper"><button class="grid-btn" onclick="adjustGrid('top', -1)">-</button></div>
+                    <div class="grid-control-wrapper"><button class="grid-btn" onclick="adjustGrid('top', 1)">+</button></div>
+                </div>
+
+                <div id="leftColControls">
+                    <div class="grid-control-wrapper"><button class="grid-btn" onclick="adjustGrid('left', -1)">-</button></div>
+                    <div class="h-8"></div> <div class="grid-control-wrapper"><button class="grid-btn" onclick="adjustGrid('left', 1)">+</button></div>
+                </div>
+
+                <div id="p5Canvas"></div>
+
+                <div id="rightColControls">
+                    <div class="grid-control-wrapper"><button class="grid-btn" onclick="adjustGrid('right', 1)">+</button></div>
+                    <div class="h-8"></div> <div class="grid-control-wrapper"><button class="grid-btn" onclick="adjustGrid('right', -1)">-</button></div>
+                </div>
+                
+                <div id="bottomRowControls">
+                    <div class="grid-control-wrapper"><button class="grid-btn" onclick="adjustGrid('bottom', -1)">-</button></div>
+                    <div class="grid-control-wrapper"><button class="grid-btn" onclick="adjustGrid('bottom', 1)">+</button></div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const FABRIC_FILES = [
+            '1.png', '2.png', '3.png', '4.png', '5.png', '6.png', 
+            '7.png', '8.png', '9.png', '10.png', '11.png', '12.png', '13.png'
+        ];
+
+        // --- GLOBALS ---
+        let gridRows = 2; // Default 2x2
+        let gridCols = 2;
+        const CELL_SIZE = 150; 
+
+        let fabrics = [{ type: 'white' }]; 
+        let preloadedImages = [];
+        let blockGrid = []; 
+        let currentFabricIndex = 1;
+
+        // --- PRELOAD ---
+        function preload() {
+            for (let i = 0; i < FABRIC_FILES.length; i++) {
+                preloadedImages[i] = loadImage('images/' + FABRIC_FILES[i]);
+            }
+        }
+
+        function setup() {
+            const canvas = createCanvas(gridCols * CELL_SIZE, gridRows * CELL_SIZE);
+            canvas.parent('p5Canvas');
+            
+            preloadedImages.forEach(img => {
+                fabrics.push({ type: 'image', img: img });
+            });
+
+            initializeGrid();
+            setupEventListeners();
+            updateUI();
+        }
+
+        function draw() {
+            background(255);
+            for (let i = 0; i < gridRows; i++) {
+                for (let j = 0; j < gridCols; j++) {
+                    drawCell(i, j);
+                }
+            }
+        }
+
+        function drawCell(row, col) {
+            const x = col * CELL_SIZE;
+            const y = row * CELL_SIZE;
+            const cell = blockGrid[row][col];
+            const cx = x + CELL_SIZE / 2;
+            const cy = y + CELL_SIZE / 2;
+
+            const triangles = [
+                { key: 'top', idx: cell.top, pts: [x, y, x + CELL_SIZE, y, cx, cy] },
+                { key: 'right', idx: cell.right, pts: [x + CELL_SIZE, y, x + CELL_SIZE, y + CELL_SIZE, cx, cy] },
+                { key: 'bottom', idx: cell.bottom, pts: [x + CELL_SIZE, y + CELL_SIZE, x, y + CELL_SIZE, cx, cy] },
+                { key: 'left', idx: cell.left, pts: [x, y + CELL_SIZE, x, y, cx, cy] }
+            ];
+
+            triangles.forEach(t => {
+                const fabric = fabrics[t.idx];
+                
+                if (!fabric || fabric.type === 'white') {
+                    fill(255);
+                    noStroke();
+                    triangle(...t.pts);
+                } else {
+                    drawingContext.save();
+                    drawingContext.beginPath();
+                    drawingContext.moveTo(t.pts[0], t.pts[1]);
+                    drawingContext.lineTo(t.pts[2], t.pts[3]);
+                    drawingContext.lineTo(t.pts[4], t.pts[5]);
+                    drawingContext.closePath();
+                    drawingContext.clip();
+
+                    image(fabric.img, x, y, CELL_SIZE, CELL_SIZE);
+                    drawingContext.restore();
+                }
+
+                stroke(0, 0, 0, 20);
+                strokeWeight(0.5);
+                noFill();
+                triangle(...t.pts);
+            });
+        }
+
+        function createEmptyCell() {
+            return { top: 0, right: 0, bottom: 0, left: 0 };
+        }
+
+        function initializeGrid() {
+            blockGrid = Array.from({ length: gridRows }, () => 
+                Array.from({ length: gridCols }, () => createEmptyCell())
+            );
+        }
+
+        // --- GRID RESIZING LOGIC ---
+        window.adjustGrid = (side, change) => {
+            // Prevent going smaller than 1x1
+            if (change === -1) {
+                if ((side === 'top' || side === 'bottom') && gridRows <= 1) return;
+                if ((side === 'left' || side === 'right') && gridCols <= 1) return;
+            }
+
+            if (side === 'top') {
+                if (change === 1) {
+                    blockGrid.unshift(Array.from({ length: gridCols }, () => createEmptyCell()));
+                    gridRows++;
+                } else {
+                    blockGrid.shift();
+                    gridRows--;
+                }
+            } else if (side === 'bottom') {
+                if (change === 1) {
+                    blockGrid.push(Array.from({ length: gridCols }, () => createEmptyCell()));
+                    gridRows++;
+                } else {
+                    blockGrid.pop();
+                    gridRows--;
+                }
+            } else if (side === 'left') {
+                if (change === 1) {
+                    blockGrid.forEach(row => row.unshift(createEmptyCell()));
+                    gridCols++;
+                } else {
+                    blockGrid.forEach(row => row.shift());
+                    gridCols--;
+                }
+            } else if (side === 'right') {
+                if (change === 1) {
+                    blockGrid.forEach(row => row.push(createEmptyCell()));
+                    gridCols++;
+                } else {
+                    blockGrid.forEach(row => row.pop());
+                    gridCols--;
+                }
+            }
+
+            resizeCanvas(gridCols * CELL_SIZE, gridRows * CELL_SIZE);
+        };
+
+        function applyFabric() {
+            if (mouseX < 0 || mouseX > width || mouseY < 0 || mouseY > height) return;
+
+            const col = floor(mouseX / CELL_SIZE);
+            const row = floor(mouseY / CELL_SIZE);
+            
+            // Bounds check
+            if (col < 0 || col >= gridCols || row < 0 || row >= gridRows) return;
+
+            const rx = mouseX - col * CELL_SIZE;
+            const ry = mouseY - row * CELL_SIZE;
+
+            let key = '';
+            if (ry <= rx && ry <= CELL_SIZE - rx) key = 'top';
+            else if (ry > rx && ry <= CELL_SIZE - rx) key = 'left';
+            else if (ry > rx && ry > CELL_SIZE - rx) key = 'bottom';
+            else if (ry <= rx && ry > CELL_SIZE - rx) key = 'right';
+
+            const targetIdx = (mouseButton === RIGHT) ? 0 : currentFabricIndex;
+            if (blockGrid[row][col][key] !== targetIdx) {
+                blockGrid[row][col][key] = targetIdx;
+            }
+        }
+
+        function mousePressed() { applyFabric(); return false; }
+        function mouseDragged() { applyFabric(); return false; }
+
+        function updateUI() {
+            const container = document.getElementById('swatchContainer');
+            container.innerHTML = ''; 
+
+            for (let i = 1; i < fabrics.length; i++) {
+                const btn = document.createElement('div');
+                btn.className = `fabric-swatch ${i === currentFabricIndex ? 'selected' : ''}`;
+                
+                const thumb = fabrics[i].img.canvas; 
+                btn.style.backgroundImage = `url(${thumb.toDataURL()})`;
+
+                btn.onclick = () => {
+                    currentFabricIndex = i;
+                    updateUI();
+                };
+                container.appendChild(btn);
+            }
+        }
+
+        function setupEventListeners() {
+            document.getElementById('clearAll').addEventListener('click', () => {
+                initializeGrid();
+            });
+            document.getElementById('exportPNG').addEventListener('click', () => saveCanvas('quilt-design', 'png'));
+            document.addEventListener('contextmenu', e => e.preventDefault());
+        }
+    </script>
+</body>
+</html>
