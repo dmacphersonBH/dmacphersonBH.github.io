@@ -6,7 +6,7 @@
     <title>Quilt Block Designer - Auto Scale</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.3/p5.js"></script>
-    <style>
+   <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         body {
             font-family: 'Inter', sans-serif;
@@ -17,7 +17,7 @@
             min-height: 100vh;
             padding: 2rem;
             margin: 0;
-            overflow: hidden; /* Prevent body scroll if possible */
+            overflow: hidden; 
         }
 
         /* --- FABRIC SWATCH STYLES --- */
@@ -41,22 +41,56 @@
         /* --- GRID CONTROL STYLES --- */
         #quiltGridContainer {
             display: grid;
-            grid-template-columns: auto 1fr auto; 
-            grid-template-rows: auto 1fr auto; 
+            
+            /* FIX 1: Use 'max-content' for the center. 
+               This forces the center column to be exactly the width of the canvas,
+               pushing the side columns out, even if it's wider than the screen. */
+            grid-template-columns: 60px max-content 60px; 
+            grid-template-rows: 60px max-content 60px; 
+            
             justify-items: center; 
             align-items: center; 
             gap: 10px;
-            /* CRITICAL: Smooth zooming transition */
+            
+            /* FIX 2: Allow the container itself to grow wider than the screen */
+            width: max-content;
+            height: max-content;
+
             transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
             transform-origin: center center;
         }
 
-        /* Grid Areas */
-        #topRowControls { grid-column: 2 / 3; grid-row: 1 / 2; width: 100%; display: flex; justify-content: center; gap: 10px; padding-bottom: 10px;}
-        #bottomRowControls { grid-column: 2 / 3; grid-row: 3 / 4; width: 100%; display: flex; justify-content: center; gap: 10px; padding-top: 10px;}
-        #leftColControls { grid-column: 1 / 2; grid-row: 2 / 3; display: flex; flex-direction: column; gap: 10px; padding-right: 10px;}
-        #rightColControls { grid-column: 3 / 4; grid-row: 2 / 3; display: flex; flex-direction: column; gap: 10px; padding-left: 10px;}
-        #p5Canvas { grid-column: 2 / 3; grid-row: 2 / 3; box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2); border-radius: 0.5rem; overflow: hidden; border: 4px solid #2d3748;}
+        /* Grid Areas & Layering */
+        #topRowControls { 
+            grid-column: 2 / 3; grid-row: 1 / 2; 
+            width: 100%; display: flex; justify-content: center; gap: 10px; padding-bottom: 10px;
+            z-index: 50; position: relative;
+        }
+        #bottomRowControls { 
+            grid-column: 2 / 3; grid-row: 3 / 4; 
+            width: 100%; display: flex; justify-content: center; gap: 10px; padding-top: 10px;
+            z-index: 50; position: relative;
+        }
+        #leftColControls { 
+            grid-column: 1 / 2; grid-row: 2 / 3; 
+            display: flex; flex-direction: column; gap: 10px; padding-right: 10px;
+            z-index: 50; position: relative;
+        }
+        #rightColControls { 
+            grid-column: 3 / 4; grid-row: 2 / 3; 
+            display: flex; flex-direction: column; gap: 10px; padding-left: 10px;
+            z-index: 50; position: relative;
+        }
+
+        #p5Canvas { 
+            grid-column: 2 / 3; grid-row: 2 / 3; 
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2); 
+            border-radius: 0.5rem; 
+            overflow: hidden; 
+            border: 4px solid #2d3748;
+            z-index: 1; 
+            position: relative;
+        }
 
         .grid-btn {
             background-color: #2563eb;
@@ -83,7 +117,6 @@
             padding: 4px;
             display: inline-block;
         }
-
     </style>
 </head>
 <body class="bg-gray-100 h-screen w-screen overflow-hidden">
@@ -150,7 +183,6 @@
 
     <script>
         // --- CONFIGURATION ---
-        // RESTORED: Your original file list
         const FABRIC_FILES = [
             '1.png', '2.png', '3.png', '4.png', '5.png', '6.png', 
             '7.png', '8.png', '9.png', '10.png', '11.png', '12.png', '13.png'
@@ -160,7 +192,7 @@
         let gridRows = 2; 
         let gridCols = 2;
         const CELL_SIZE = 220; 
-        let currentScale = 1; // Tracks the zoom level
+        let currentScale = 1; 
 
         let fabrics = [{ type: 'white' }]; 
         let preloadedImages = [];
@@ -169,7 +201,6 @@
 
         // --- PRELOAD ---
         function preload() {
-            // RESTORED: Loading from your local 'images' folder
             for (let i = 0; i < FABRIC_FILES.length; i++) {
                 preloadedImages[i] = loadImage('images/' + FABRIC_FILES[i]);
             }
@@ -187,7 +218,7 @@
             setupEventListeners();
             updateUI();
             
-            // Trigger initial fit
+            // Trigger initial fit with a slight delay to ensure DOM is ready
             setTimeout(fitToScreen, 100); 
         }
 
@@ -293,26 +324,36 @@
             }
 
             resizeCanvas(gridCols * CELL_SIZE, gridRows * CELL_SIZE);
-            fitToScreen(); // Re-calculate zoom
+            fitToScreen(); 
         };
 
-        // --- FIT TO SCREEN LOGIC ---
+        // --- FIXED FIT TO SCREEN LOGIC ---
         function fitToScreen() {
             const workspace = document.getElementById('mainWorkspace');
             const gridContainer = document.getElementById('quiltGridContainer');
             
             if (!workspace || !gridContainer) return;
 
+            // 1. Get available space in the window
+            // Subtracting 80 provides a safe buffer from the screen edges
             const availableWidth = workspace.clientWidth - 80; 
             const availableHeight = workspace.clientHeight - 80;
 
-            const contentWidth = (gridCols * CELL_SIZE) + 100; 
-            const contentHeight = (gridRows * CELL_SIZE) + 100;
+            // 2. Calculate content size
+            // INCREASED BUFFER: Changed +100 to +300.
+            // This accounts for the buttons (40px) + gaps + padding on BOTH sides.
+            // This ensures the scaler "sees" the buttons as part of the width.
+            const contentWidth = (gridCols * CELL_SIZE) + 300; 
+            const contentHeight = (gridRows * CELL_SIZE) + 300;
 
+            // 3. Determine Scale
             const scaleX = availableWidth / contentWidth;
             const scaleY = availableHeight / contentHeight;
+            
+            // Use the smaller scale to fit everything, but cap it at 1.0 (never zoom in past 100%)
             currentScale = Math.min(scaleX, scaleY, 1); 
 
+            // 4. Apply Transform
             gridContainer.style.transform = `scale(${currentScale})`;
         }
 
@@ -320,7 +361,6 @@
 
         function applyFabric() {
             // Adjust mouse coordinates by the current scale
-            // Because visually the canvas is smaller, but logically it is still large.
             const adjustedMouseX = mouseX / currentScale;
             const adjustedMouseY = mouseY / currentScale;
 
@@ -357,7 +397,6 @@
                 const btn = document.createElement('div');
                 btn.className = `fabric-swatch ${i === currentFabricIndex ? 'selected' : ''}`;
                 
-                // Use the P5 image canvas as a thumbnail
                 const thumb = fabrics[i].img.canvas; 
                 btn.style.backgroundImage = `url(${thumb.toDataURL()})`;
 
@@ -372,6 +411,7 @@
         function setupEventListeners() {
             document.getElementById('clearAll').addEventListener('click', () => {
                 initializeGrid();
+                setTimeout(fitToScreen, 50); // Recalculate zoom on reset
             });
             document.getElementById('exportPNG').addEventListener('click', () => saveCanvas('quilt-design', 'png'));
             document.addEventListener('contextmenu', e => e.preventDefault());
