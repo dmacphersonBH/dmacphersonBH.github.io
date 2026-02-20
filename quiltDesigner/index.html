@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quilt Block Designer - Auto Scale</title>
+    <title>Quilt Block Designer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.3/p5.js"></script>
    <style>
@@ -185,7 +185,7 @@
         // --- CONFIGURATION ---
         const FABRIC_FILES = [
             '1.png', '2.png', '3.png', '4.png', '5.png', '6.png', 
-            '7.png', '8.png', '9.png', '10.png', '11.png', '12.png', '13.png', '14.png'
+            '7.png', '8.png', '9.png', '10.png', '11.png', '12.png', '13.png'
         ];
 
         // --- GLOBALS ---
@@ -265,8 +265,8 @@
                     drawingContext.restore();
                 }
 
-                stroke(0, 0, 0, 20);
-                strokeWeight(0.5);
+                stroke(0, 0, 0, 100);
+                strokeWeight(1);
                 noFill();
                 triangle(...t.pts);
             });
