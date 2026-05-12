@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Project - AR View</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 50px 20px; color: #333; }
+        .ar-link img {
+            width: 100%;
+            max-width: 400px;
+            border-radius: 20px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+            cursor: pointer;
+        }
+        .description {
+            margin-top: 20px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.6;
+            color: #666;
+        }
+        .back-link { margin-top: 40px; display: block; color: #3498db; text-decoration: none; }
+    </style>
+</head>
+<body>
+
+    <h1>Project Title by Student Name</h1>
+
+    <a class="ar-link" rel="ar" href="assets/models/your-file.usdz">
+        <img src="assets/images/preview-thumbnail.jpg" alt="Tap to view in AR">
+    </a>
+
+    <div class="description">
+        <p><strong>Instructions:</strong> Tap the image above to launch the AR experience. Ensure you are in a well-lit area and move your device to find the floor plane.</p>
+        <p><em>Project Description:</em> This experience explores digital sculpture and spatial interaction.</p>
+    </div>
+
+    <a href="index.html" class="back-link">← Back to Gallery</a>
+
+</body>
+</html>

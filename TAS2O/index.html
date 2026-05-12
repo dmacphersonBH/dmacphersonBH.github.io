@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TAS2O - Digital Design AR Gallery</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f4f4f9; padding: 20px; text-align: center; }
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 20px;
+            max-width: 1000px;
+            margin: auto;
+        }
+        .student-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-decoration: none;
+            color: #333;
+            transition: transform 0.2s;
+        }
+        .student-card:hover { transform: translateY(-5px); background: #eef2ff; }
+        h1 { color: #2c3e50; }
+    </style>
+</head>
+<body>
+
+    <h1>TAS2O Student AR Gallery</h1>
+    <p>Select a student to view their Reality Composer experience.</p>
+
+    <div class="grid-container">
+        <a href="template.html" class="student-card">
+            <h3>D. Macpherson</h3>
+        </a>
+        
+        <a href="JSmith.html" class="student-card">
+            <h3>J. Smith</h3>
+        </a>
+    </div>
+
+</body>
