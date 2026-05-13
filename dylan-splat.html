@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gaussian Splat Viewer</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #000; 
+            color: white;
+            font-family: sans-serif;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.157.0/build/three.module.js",
+                "@mkkellogg/gaussian-splats-3d": "https://unpkg.com/@mkkellogg/gaussian-splats-3d@0.3.1/build/gaussian-splats-3d.module.js"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="info">Loading Gaussian Splat...</div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import * as GaussianSplats3D from '@mkkellogg/gaussian-splats-3d';
+
+        // 1. Initialize the viewer
+        // You can tweak cameraUp, initialCameraPosition, and initialCameraLookAt based on your specific capture's orientation
+        const viewer = new GaussianSplats3D.Viewer({
+            'cameraUp': [0, -1, -0.6],
+            'initialCameraPosition': [-1, -4, 6],
+            'initialCameraLookAt': [0, 4, 0]
+        });
+
+        // 2. Load the .ply file
+        // REPLACE 'model.ply' WITH THE PATH TO YOUR ACTUAL .PLY FILE
+        const plyFilePath = 'dylan.ply'; 
+
+        viewer.addSplatScene(plyFilePath, {
+            'splatAlphaCrop': 0.2, // Hides splats with very low opacity to clean up noise
+            'showLoadingUI': true
+        })
+        .then(() => {
+            // 3. Start the render loop once loaded
+            document.getElementById('info').innerText = "Controls: Left Click to Rotate | Right Click to Pan | Scroll to Zoom";
+            viewer.start();
+        })
+        .catch((error) => {
+            console.error("Error loading the splat file:", error);
+            document.getElementById('info').innerText = "Error loading splat. Check console. Make sure you are running a local server.";
+        });
+    </script>
+</body>
+</html>
